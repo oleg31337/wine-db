@@ -346,9 +346,8 @@ def import_backup(db: Session, uploads_dir: str, raw: bytes, replace: bool = Tru
             entry = f"photos/{stored}"
             if entry in names and _safe_photo_name(entry):
                 try:
-                    photo_name = store_photo(
-                        uploads_dir, normalize_image(zf.read(entry), 32 * 1024 * 1024)
-                    )
+                    _ai_bytes, photo_data = normalize_image(zf.read(entry), 32 * 1024 * 1024)
+                    photo_name = store_photo(uploads_dir, photo_data)
                 except (HTTPException, OSError):
                     photo_name = None
 
