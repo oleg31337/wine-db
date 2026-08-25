@@ -1,0 +1,30 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+
+# Persistent application data — NEVER commit this.
+# The whole ./data folder (SQLite db + uploads + backups) is host state.
+/data/
+/pgdata/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+*.zip
+uploads/
+
+# OS noise
+.DS_Store
+Thumbs.db

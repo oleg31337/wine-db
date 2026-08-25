@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="referrer" content="no-referrer" />
+<meta name="color-scheme" content="light only" />
+<meta name="theme-color" content="#f6f3ef" />
+<title>wine-db · tasting notes</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<div id="auth-screen" class="auth-wrap">
+  <div class="auth-card card">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🍷</span>
+      <span class="brand-text">wine-db<br /><small>private tasting notes</small></span>
+    </div>
+
+    <form id="login-form" autocomplete="on" novalidate>
+      <div class="field">
+        <label for="login-username">Username</label>
+        <input id="login-username" name="username" autocomplete="username"
+               required maxlength="32" autocapitalize="none" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password"
+               autocomplete="current-password" required maxlength="128" />
+      </div>
+      <button class="btn-primary btn-block" type="submit">Sign in</button>
+    </form>
+
+    <p class="hint" id="auth-note">Accounts are created by the administrator.</p>
+    <p class="hint" id="auth-error" role="alert" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app-screen" class="hidden">
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🍷</span>
+      <span class="brand-text">wine-db</span>
+    </div>
+    <button type="button" id="btn-account" class="btn-quiet btn-sm" title="Account & data">
+      <span aria-hidden="true">⚙</span><span id="account-name" class="sr-only">Account</span>
+      <span id="admin-badge" class="badge badge-admin hidden">admin</span>
+    </button>
+  </header>
+
+  <nav class="tabbar" role="tablist" aria-label="Main sections">
+    <button type="button" role="tab" data-view="browse" aria-selected="true">
+      <span class="ico" aria-hidden="true">🔍</span><span>Browse</span>
+    </button>
+    <button type="button" role="tab" data-view="favorites" aria-selected="false">
+      <span class="ico" aria-hidden="true">★</span><span>Favorites</span>
+    </button>
+    <button type="button" role="tab" data-view="scan" aria-selected="false">
+      <span class="ico" aria-hidden="true">📷</span><span>Add wine</span>
+    </button>
+    <button type="button" role="tab" data-view="data" data-admin="1" aria-selected="false">
+      <span class="ico" aria-hidden="true">🗄</span><span>Data</span>
+    </button>
+  </nav>
+
+  <main>
+    <!-- ---- browse ---- -->
+    <section id="view-browse" class="view active" role="tabpanel" aria-label="Browse wines">
+      <div class="card">
+        <div class="search-bar">
+          <input id="search-q" type="search" placeholder="Search name, maker, grape, place…"
+                 maxlength="200" enterkeyhint="search" autocapitalize="none" />
+          <button type="button" id="btn-filters" class="btn-sm">Filters</button>
+        </div>
+
+        <div id="filter-panel" class="hidden">
+          <div class="filters">
+            <div>
+              <label for="f-country">Country</label>
+              <select id="f-country"><option value="">Any country</option></select>
+            </div>
+            <div>
+              <label for="f-region">Region</label>
+              <select id="f-region"><option value="">Any region</option></select>
+            </div>
+            <div>
+              <label for="f-rating">Minimum rating</label>
+              <select id="f-rating">
+                <option value="">Any rating</option>
+                <option value="5">★★★★★ only</option>
+                <option value="4">★★★★ and up</option>
+                <option value="3">★★★ and up</option>
+                <option value="2">★★ and up</option>
+                <option value="1">★ and up</option>
+              </select>
+            </div>
+            <div>
+              <label for="f-sort">Sort by</label>
+              <select id="f-sort">
+                <option value="created:desc">Newest first</option>
+                <option value="created:asc">Oldest first</option>
+                <option value="name:asc">Name A–Z</option>
+                <option value="name:desc">Name Z–A</option>
+                <option value="vintage:desc">Vintage, newest</option>
+                <option value="vintage:asc">Vintage, oldest</option>
+              </select>
+            </div>
+          </div>
+          <div class="chips" id="type-chips" role="group" aria-label="Wine type">
+            <button type="button" class="chip" data-type="red" aria-pressed="false">Red</button>
+            <button type="button" class="chip" data-type="white" aria-pressed="false">White</button>
+            <button type="button" class="chip" data-type="rose" aria-pressed="false">Rosé</button>
+            <button type="button" class="chip" data-type="sparkling" aria-pressed="false">Sparkling</button>
+            <button type="button" class="chip" data-type="other" aria-pressed="false">Other</button>
+          </div>
+          <div class="chips">
+            <button type="button" class="chip" id="chip-rating-scope" aria-pressed="false"
+                    title="Filter on my own rating instead of the shared average">My rating only</button>
+            <button type="button" class="chip" id="chip-unrated" aria-pressed="false">Not rated by me</button>
+            <button type="button" class="btn-quiet btn-sm" id="btn-clear-filters">Clear all</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Cellar</h2>
+        <span class="muted" id="result-count"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn-sm" id="btn-manual-add">+ Add manually</button>
+      </div>
+
+      <div id="wine-results" class="wine-grid"></div>
+      <div id="results-status"></div>
+      <div style="margin-top:1rem;text-align:center">
+        <button type="button" id="btn-load-more" class="hidden">Load more</button>
+      </div>
+    </section>
+
+    <!-- ---- favorites ---- -->
+    <section id="view-favorites" class="view" role="tabpanel" aria-label="Favorites lists">
+      <div class="section-head">
+        <h2>Favorites lists</h2>
+        <span class="spacer"></span>
+        <button type="button" class="btn-sm btn-primary" id="btn-new-list">+ New list</button>
+      </div>
+      <p class="muted">Lists are shared — everyone using this database sees and edits the same lists.</p>
+      <div id="fav-lists" class="fav-list"></div>
+
+      <div id="fav-detail" class="hidden" style="margin-top:1.25rem">
+        <div class="section-head">
+          <button type="button" class="btn-sm btn-quiet" id="btn-fav-back">‹ Lists</button>
+          <h2 id="fav-detail-name"></h2>
+          <span class="spacer"></span>
+          <button type="button" class="btn-sm" id="btn-rename-list">Rename</button>
+          <button type="button" class="btn-sm btn-danger" id="btn-delete-list">Delete list</button>
+        </div>
+        <div id="fav-wines" class="wine-grid"></div>
+      </div>
+    </section>
+
+    <!-- ---- scan / add ---- -->
+    <section id="view-scan" class="view" role="tabpanel" aria-label="Add a wine">
+      <div class="card">
+        <h2>Add a wine</h2>
+        <p class="muted">
+          Point the camera at the bottle. The barcode is read on your phone; the label is read by
+          the AI model on the server. Everything found is only a suggestion — you stay in control
+          of every field.
+        </p>
+
+        <div class="scan-stage" id="scan-stage">
+          <video id="scan-video" playsinline muted class="hidden"></video>
+          <img id="scan-preview" class="hidden" alt="Captured label" />
+          <div id="scan-reticle" class="scan-reticle hidden"></div>
+          <div id="scan-idle" class="muted" style="color:#e8e0d6;padding:1rem;text-align:center">
+            Camera is off
+          </div>
+          <div id="scan-hint" class="scan-hint hidden"></div>
+        </div>
+
+        <div class="scan-actions">
+          <button type="button" id="btn-cam-start" class="btn-primary full">Start camera</button>
+          <button type="button" id="btn-capture" class="btn-primary hidden">Capture label</button>
+          <button type="button" id="btn-cam-stop" class="hidden">Stop camera</button>
+          <button type="button" id="btn-cam-flip" class="hidden">Flip camera</button>
+          <label class="btn full" for="file-input" style="cursor:pointer">
+            Choose a photo instead
+            <input id="file-input" type="file" accept="image/*" capture="environment"
+                   class="sr-only" />
+          </label>
+        </div>
+
+        <div class="field" style="margin-top:0.9rem">
+          <label for="manual-barcode">Barcode <span class="muted">(auto-filled when detected)</span></label>
+          <div class="pill-row">
+            <input id="manual-barcode" inputmode="numeric" maxlength="64"
+                   placeholder="e.g. 3760040370019" style="flex:1;min-width:160px" />
+            <button type="button" class="btn-sm" id="btn-barcode-lookup">Look up</button>
+          </div>
+          <p class="hint" id="barcode-status"></p>
+        </div>
+
+        <div class="pill-row" style="margin-top:0.5rem">
+          <button type="button" id="btn-skip-to-form" class="btn-sm">Fill the card by hand →</button>
+        </div>
+      </div>
+
+      <div id="suggest-panel" class="hidden"></div>
+    </section>
+
+    <!-- ---- data ---- -->
+    <section id="view-data" class="view" role="tabpanel" aria-label="Backup and account">
+      <div class="card" id="admin-users-card">
+        <h2>User accounts</h2>
+        <p class="muted">Only the administrator can add or remove accounts.</p>
+        <div id="user-list" class="muted"></div>
+        <div class="field" style="margin-top:0.8rem">
+          <label for="new-username">New username</label>
+          <input id="new-username" maxlength="32" autocapitalize="none" spellcheck="false" />
+        </div>
+        <div class="field">
+          <label for="new-display">Display name <span class="muted">(optional)</span></label>
+          <input id="new-display" maxlength="64" />
+        </div>
+        <div class="field">
+          <label for="new-password">Temporary password</label>
+          <input id="new-password" type="password" autocomplete="new-password" maxlength="128" />
+          <p class="hint">At least 12 characters, mixing 3 of: lower, upper, digit, symbol.</p>
+        </div>
+        <button type="button" class="btn-primary" id="btn-add-user">Add user</button>
+      </div>
+
+      <div class="card">
+        <h2>Backup</h2>
+        <p class="muted">
+          The export contains every wine, photo, rating, comment and favorites list as a single
+          ZIP file.
+        </p>
+        <div class="pill-row">
+          <button type="button" class="btn-primary" id="btn-export">Download backup (.zip)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Restore</h2>
+        <p class="muted">Import a wine-db backup ZIP.</p>
+        <div class="field">
+          <label for="restore-mode">Mode</label>
+          <select id="restore-mode">
+            <option value="merge">Merge — keep current data, add from backup</option>
+            <option value="replace">Replace — wipe current wines, then restore</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="btn" for="restore-file" style="cursor:pointer">
+            Choose backup ZIP…
+            <input id="restore-file" type="file" accept=".zip,application/zip" class="sr-only" />
+          </label>
+          <p class="hint" id="restore-name"></p>
+        </div>
+        <button type="button" class="btn-danger" id="btn-import" disabled>Restore backup</button>
+      </div>
+
+      <div class="card">
+        <h2>Account</h2>
+        <p class="muted" id="account-info"></p>
+        <div class="field">
+          <label for="pw-current">Current password</label>
+          <input id="pw-current" type="password" autocomplete="current-password" maxlength="128" />
+        </div>
+        <div class="field">
+          <label for="pw-new">New password</label>
+          <input id="pw-new" type="password" autocomplete="new-password" maxlength="128" />
+        </div>
+        <div class="pill-row">
+          <button type="button" id="btn-change-pw">Change password</button>
+          <button type="button" id="btn-logout" class="btn-quiet">Sign out</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Who shares this database</h2>
+        <div id="user-list" class="muted"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="/assets/core.js"></script>
+<script src="/assets/render.js"></script>
+<script src="/assets/wineform.js"></script>
+<script src="/assets/detail.js"></script>
+<script src="/assets/barcode.js"></script>
+<script src="/assets/scan.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

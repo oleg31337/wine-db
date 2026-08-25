@@ -1,0 +1,10 @@
+{
+  "name": "wine-db — private tasting notes",
+  "short_name": "wine-db",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ef",
+  "theme_color": "#7b2d3e",
+  "orientation": "portrait-primary",
+  "icons": []
+}
