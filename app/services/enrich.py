@@ -157,8 +157,8 @@ _TEXT_PROMPT = (
     '{"name": str|null, "maker": str|null, "wine_type": "red"|"white"|"rose"|'
     '"sparkling"|"other"|null, "country": str|null, "region": str|null, '
     '"vintage": int|null, "grape": str|null, "sugar_g_l": number|null, '
-    '"alcohol_pct": number|null, "aromas": str|null, "acidity": 0-5|null, '
-    '"sweetness": 0-5|null, "body": 0-5|null, "mouthfeel": 0-5|null, "wood": 0-5|null, '
+    '"alcohol_pct": number|null, "aromas": str|null, "acidity": 0-3|null, '
+    '"sweetness": 0-3|null, "body": 0-3|null, "mouthfeel": 0-3|null, "wood": 0-3|null, '
     '"confidence": "high"|"medium"|"low"}. '
     "Never provide a rating or a tasting comment. Use null when unsure."
 )
@@ -253,10 +253,74 @@ def _coerce(raw: dict) -> dict:
     _num("vintage", 1800, 2200, as_int=True)
     _num("sugar_g_l", 0, 500)
     _num("alcohol_pct", 0, 100)
+    # Structure gauges are a simple 0-3 scale (0 = "no such taste", null = unassessed).
     for gauge in ("acidity", "sweetness", "body", "mouthfeel", "wood"):
-        _num(gauge, 0, 5, as_int=True)
+        _num(gauge, 0, 3, as_int=True)
+    # When the model returns prose instead of a number (common from the web
+    # summariser), map well-known descriptors onto the 0-3 scale. This lets the
+    # structure parameters be filled from internet text, not just a numeric model.
+    for gauge in ("acidity", "sweetness", "body", "mouthfeel", "wood"):
+        if gauge not in out:
+            prose_level = _gauge_word_level(raw.get(gauge))
+            if prose_level is not None:
+                out[gauge] = prose_level
 
     return {k: v for k, v in out.items() if k in ENRICHABLE_FIELDS}
+
+
+# Descriptive words the (web) summariser returns for the structure gauges,
+# mapped onto the 0-3 scale. 0 explicitly means "no such taste" (e.g. "dry",
+# "unoaked"), so those words yield 0 - not "unknown".
+_GAUGE_WORDS = {
+    "acidity": [
+        (3, ("high acidity", "very acidic", "bracing", "crisp", "racy", "zesty", "tart")),
+        (2, ("good acidity", "lively acidity", "fresh", "bright", "vibrant")),
+        (1, ("soft acidity", "gentle acidity", "low acid", "mild acid")),
+        (0, ("no acidity", "flat", "flabby")),
+    ],
+    "sweetness": [
+        (3, ("very sweet", "sweet", "dessert", "syrupy", "luscious")),
+        (2, ("off-dry", "semi-sweet", "medium sweet")),
+        (1, ("lightly sweet", "hint of sweetness", "touch of sweetness")),
+        (0, ("dry", "bone dry", "brut", "extra brut", "unsweetened")),
+    ],
+    "body": [
+        (3, ("full-bodied", "full body", "massive", "weighty", "opulent", "concentrated")),
+        (2, ("medium-bodied", "medium body", "rounded", "rich")),
+        (1, ("light-bodied", "light body", "lean", "delicate", "ethereal")),
+        (0, ("watery", "thin", "no body")),
+    ],
+    "mouthfeel": [
+        (3, ("tannic", "astringent", "grippy", "chewy", "structured")),
+        (2, ("firm", "textured", "velvety")),
+        (1, ("soft", "smooth", "silky")),
+        (0, ("flabby", "flat mouthfeel")),
+    ],
+    "wood": [
+        (3, ("heavily oaked", "heavy oak", "toasty oak", "pronounced vanilla", "new oak")),
+        (2, ("oaked", "oak-aged", "barrel-aged", "vanilla", "spicy oak")),
+        (1, ("lightly oaked", "subtle oak", "hint of oak", "touch of wood")),
+        (0, ("unoaked", "un-oaked", "stainless steel", "no oak", "steel fermented")),
+    ],
+}
+
+
+def _gauge_word_level(value) -> int | None:
+    """Map a prose descriptor onto the 0-3 structure scale, else None.
+
+    The numeric path (_num) is preferred; this only fires when the model sent
+    words instead of a number. An exact substring match wins; otherwise None so
+    we never guess.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.lower()
+    for gauge, levels in _GAUGE_WORDS.items():
+        for level, words in levels:
+            for word in words:
+                if word in text:
+                    return level
+    return None
 
 
 class AIClient:
@@ -482,7 +546,11 @@ _SUMMARY_PROMPT = (
     '{"name": str|null, "maker": str|null, "wine_type": "red"|"white"|"rose"|'
     '"sparkling"|"other"|null, "country": str|null, "region": str|null, '
     '"vintage": int|null, "grape": str|null, "sugar_g_l": number|null, '
-    '"alcohol_pct": number|null, "aromas": str|null}. '
+    '"alcohol_pct": number|null, "aromas": str|null, '
+    '"acidity": 0-3|null, "sweetness": 0-3|null, "body": 0-3|null, '
+    '"mouthfeel": 0-3|null, "wood": 0-3|null}. '
+    "Score the structure gauges on a 0-3 scale where 0 means 'no such taste' "
+    "(e.g. a 'dry, unoaked' wine is sweetness 0 and wood 0). "
     "Use only facts present in the text. Use null when the text does not say. "
     "Never provide a rating or tasting comment."
 )

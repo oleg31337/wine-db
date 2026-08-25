@@ -83,7 +83,7 @@ class Wine(Base):
     aromas: Mapped[str | None] = mapped_column(Text)
     barcode: Mapped[str | None] = mapped_column(String(64), index=True)
 
-    # Gauge bars, 0-5 (nullable = not assessed)
+    # Gauge bars, 0-3 (0 = "no such taste"; nullable = not assessed)
     acidity: Mapped[int | None] = mapped_column(Integer)
     sweetness: Mapped[int | None] = mapped_column(Integer)
     body: Mapped[int | None] = mapped_column(Integer)
@@ -108,11 +108,11 @@ class Wine(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("acidity IS NULL OR (acidity BETWEEN 0 AND 5)", name="ck_wine_acidity"),
-        CheckConstraint("sweetness IS NULL OR (sweetness BETWEEN 0 AND 5)", name="ck_wine_sweetness"),
-        CheckConstraint("body IS NULL OR (body BETWEEN 0 AND 5)", name="ck_wine_body"),
-        CheckConstraint("mouthfeel IS NULL OR (mouthfeel BETWEEN 0 AND 5)", name="ck_wine_mouthfeel"),
-        CheckConstraint("wood IS NULL OR (wood BETWEEN 0 AND 5)", name="ck_wine_wood"),
+        CheckConstraint("acidity IS NULL OR (acidity BETWEEN 0 AND 3)", name="ck_wine_acidity"),
+        CheckConstraint("sweetness IS NULL OR (sweetness BETWEEN 0 AND 3)", name="ck_wine_sweetness"),
+        CheckConstraint("body IS NULL OR (body BETWEEN 0 AND 3)", name="ck_wine_body"),
+        CheckConstraint("mouthfeel IS NULL OR (mouthfeel BETWEEN 0 AND 3)", name="ck_wine_mouthfeel"),
+        CheckConstraint("wood IS NULL OR (wood BETWEEN 0 AND 3)", name="ck_wine_wood"),
         CheckConstraint("sugar_g_l IS NULL OR (sugar_g_l BETWEEN 0 AND 500)", name="ck_wine_sugar"),
         CheckConstraint("alcohol_pct IS NULL OR (alcohol_pct BETWEEN 0 AND 100)", name="ck_wine_abv"),
         Index("ix_wines_name_lower", func.lower(name)),

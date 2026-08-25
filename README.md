@@ -82,6 +82,14 @@ python -m app.tools.admin_hash "your-admin-password"
 The raw back-label text is stored with the wine as provenance; the structured
 facts (grape, region, country, alcohol, sugar) are merged into the fields.
 
+- **Structure gauges (Acidity, Sweetness, Body, Mouthfeel, Wood/Oak)** use a
+  simple **0–3 scale**, shown as little progress bars on the card. `0` means
+  *"no such taste"* (e.g. a dry, unoaked wine); leave it blank to mark the
+  trait as *not assessed*. The scan pipeline tries to fill these from the label
+  **and from a web search** — if the web summariser describes the wine as
+  *"full-bodied"* or *"oaked"*, those words are mapped onto the 0–3 scale
+  automatically. You can always adjust them on the card.
+
 ### How images are handled
 
 - **In the browser:** photos are downscaled (≤1600px JPEG) *before* upload so

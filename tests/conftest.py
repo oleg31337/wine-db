@@ -182,8 +182,8 @@ def wine_payload(**overrides) -> dict:
         "aromas": "blackcurrant, cedar",
         "acidity": 3,
         "sweetness": 1,
-        "body": 4,
-        "mouthfeel": 3,
+        "body": 3,
+        "mouthfeel": 2,
         "wood": 2,
     }
     payload.update(overrides)

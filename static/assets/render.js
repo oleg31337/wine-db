@@ -57,13 +57,13 @@
     return wrap;
   };
 
-  /* Read-only gauge bars. */
+  /* Read-only gauge bars. Scale is 0-3 (0 = "no such taste"). */
   W.gaugeBars = function (wine) {
     var rows = W.GAUGES.map(function (pair) {
       var key = pair[0];
       var raw = wine[key];
       var has = raw !== null && raw !== undefined;
-      var pct = has ? (Number(raw) / 5) * 100 : 0;
+      var pct = has ? (Number(raw) / 3) * 100 : 0;
       return el("div", { class: "gauge-row" }, [
         el("span", { class: "g-label", text: pair[1] }),
         el(
@@ -72,41 +72,57 @@
             class: "gauge-track",
             role: "meter",
             "aria-valuemin": "0",
-            "aria-valuemax": "5",
+            "aria-valuemax": "3",
             "aria-valuenow": has ? String(raw) : "0",
             "aria-label": pair[1],
           },
           [el("div", { class: "gauge-fill", style: "width:" + pct + "%" })]
         ),
-        el("span", { class: "g-val", text: has ? raw + "/5" : "–" }),
+        el("span", { class: "g-val", text: has ? raw + "/3" : "–" }),
       ]);
     });
     return el("div", { class: "gauges" }, rows);
   };
 
-  /* 0-5 gauge picker used in the edit form. */
+  /* 0-3 gauge picker used in the edit form. Renders as a 3-segment progress
+   * bar: tap a segment to set that level, tap the leftmost (0) to clear to
+   * "no such taste". Tapping the current level again clears to unassessed.
+   */
   W.gaugeInput = function (key, label, current, onChange) {
     var value = current === null || current === undefined ? null : Number(current);
     var row = el("div", { class: "field" });
     row.appendChild(el("label", { text: label }));
-    var group = el("div", { class: "gauge-input", role: "group", "aria-label": label });
+    var group = el("div", {
+      class: "gauge-pick",
+      role: "group",
+      "aria-label": label,
+      dataset: { key: key },
+    });
 
     function paint() {
-      W.$$("button", group).forEach(function (b) {
-        var on = b.dataset.val === String(value);
-        b.setAttribute("aria-pressed", on ? "true" : "false");
+      W.$$(".seg", group).forEach(function (seg) {
+        var n = Number(seg.dataset.val);
+        var on = value !== null && n <= value;
+        seg.classList.toggle("on", on);
+        seg.setAttribute("aria-pressed", on ? "true" : "false");
       });
     }
 
-    for (var i = 0; i <= 5; i++) {
+    for (var i = 0; i <= 3; i++) {
       (function (n) {
         group.appendChild(
           el("button", {
             type: "button",
-            text: String(n),
+            class: "seg",
             dataset: { val: String(n) },
+            "aria-label": n === 0 ? "No " + label.toLowerCase() : label + " " + n,
             onclick: function () {
-              value = value === n ? null : n;
+              // Tap the active level (or 0 when set) to clear -> unassessed.
+              if (value === n) {
+                value = null;
+              } else {
+                value = n;
+              }
               paint();
               onChange(value);
             },
@@ -116,7 +132,12 @@
     }
     paint();
     row.appendChild(group);
-    row.appendChild(el("p", { class: "hint", text: "Tap the same number again to clear." }));
+    row.appendChild(
+      el("p", {
+        class: "hint",
+        text: "0 = no such taste · tap the same segment to clear.",
+      })
+    );
     return row;
   };
 

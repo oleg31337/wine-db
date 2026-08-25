@@ -102,11 +102,11 @@ class WineBase(BaseModel):
     # region, country, alcohol, sugar) so the back label enriches the card.
     back_label_text: str | None = Field(default=None, max_length=4000)
 
-    acidity: int | None = Field(default=None, ge=0, le=5)
-    sweetness: int | None = Field(default=None, ge=0, le=5)
-    body: int | None = Field(default=None, ge=0, le=5)
-    mouthfeel: int | None = Field(default=None, ge=0, le=5)
-    wood: int | None = Field(default=None, ge=0, le=5)
+    acidity: int | None = Field(default=None, ge=0, le=3)
+    sweetness: int | None = Field(default=None, ge=0, le=3)
+    body: int | None = Field(default=None, ge=0, le=3)
+    mouthfeel: int | None = Field(default=None, ge=0, le=3)
+    wood: int | None = Field(default=None, ge=0, le=3)
 
     @field_validator(
         "name", "maker", "country", "region", "grape", "aromas", "barcode", mode="after"
@@ -152,11 +152,11 @@ class WineUpdate(BaseModel):
     alcohol_pct: float | None = Field(default=None, ge=0, le=100)
     aromas: str | None = Field(default=None, max_length=2000)
     barcode: str | None = Field(default=None, max_length=64)
-    acidity: int | None = Field(default=None, ge=0, le=5)
-    sweetness: int | None = Field(default=None, ge=0, le=5)
-    body: int | None = Field(default=None, ge=0, le=5)
-    mouthfeel: int | None = Field(default=None, ge=0, le=5)
-    wood: int | None = Field(default=None, ge=0, le=5)
+    acidity: int | None = Field(default=None, ge=0, le=3)
+    sweetness: int | None = Field(default=None, ge=0, le=3)
+    body: int | None = Field(default=None, ge=0, le=3)
+    mouthfeel: int | None = Field(default=None, ge=0, le=3)
+    wood: int | None = Field(default=None, ge=0, le=3)
 
 
 class RatingOut(BaseModel):

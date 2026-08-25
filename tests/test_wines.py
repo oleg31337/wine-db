@@ -62,9 +62,9 @@ def test_out_of_range_numbers_rejected(api, user):
     assert api.post("/api/wines", json=wine_payload(vintage=3000)).status_code == 422
 
 
-def test_gauges_must_be_zero_to_five(api, user):
+def test_gauges_must_be_zero_to_three(api, user):
     for field in ("acidity", "sweetness", "body", "mouthfeel", "wood"):
-        assert api.post("/api/wines", json=wine_payload(**{field: 6})).status_code == 422
+        assert api.post("/api/wines", json=wine_payload(**{field: 4})).status_code == 422
         assert api.post("/api/wines", json=wine_payload(**{field: -1})).status_code == 422
         resp = api.post("/api/wines", json=wine_payload(name="ok " + field, **{field: 0}))
         assert resp.status_code == 201
@@ -104,10 +104,10 @@ def test_every_field_is_editable(api, user):
         "alcohol_pct": 12.0,
         "aromas": "rose petal, tar",
         "barcode": "1234567890123",
-        "acidity": 5,
+        "acidity": 3,
         "sweetness": 0,
         "body": 2,
-        "mouthfeel": 4,
+        "mouthfeel": 2,
         "wood": 1,
     }
     resp = api.patch("/api/wines/" + wine["id"], json=changes)

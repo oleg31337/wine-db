@@ -278,6 +278,26 @@ def test_gauge_coercion_clamps_to_range(field):
     assert enrich_module._coerce({field: "high"}).get(field) is None
 
 
+def test_gauge_prose_descriptors_map_to_0_3():
+    """Web/internet text that describes the structure fills the 0-3 gauges."""
+    got = enrich_module._coerce(
+        {
+            "body": "full-bodied",
+            "wood": "heavily oaked",
+            "sweetness": "dry",
+            "acidity": "crisp, high acidity",
+            "mouthfeel": "tannic",
+        }
+    )
+    assert got["body"] == 3
+    assert got["wood"] == 3
+    assert got["sweetness"] == 0  # "dry" explicitly means no sweetness
+    assert got["acidity"] == 3
+    assert got["mouthfeel"] == 3
+    # Unknown prose yields no guess (stays absent), never an invented level.
+    assert enrich_module._coerce({"body": "mysterious"}).get("body") is None
+
+
 def test_coercion_drops_unknown_and_dangerous_keys():
     got = enrich_module._coerce(
         {"name": "X", "id": "hack", "created_by": "hack", "photo": "../etc/passwd", "rating": 5}
@@ -319,6 +339,40 @@ def test_web_results_are_summarised_into_fields(api, user, fake_ai, monkeypatch)
     assert body["suggestion"]["country"] == "Spain"
     assert body["suggestion"]["grape"] == "Tempranillo"
     assert "web search" in " ".join(body["messages"]).lower()
+
+
+def test_web_search_can_fill_structure_gauges(api, user, fake_ai, monkeypatch):
+    """The web summariser's structure gauges flow into the suggestion (0-3)."""
+    import app.routers.scan as scan_router
+
+    async def fake_search(settings, query):
+        return "Dry, full-bodied, unoaked Rioja with high acidity and tannins.", ["src"]
+
+    async def fake_summarize(self, context):
+        return {
+            "wine_type": "red",
+            "country": "Spain",
+            "region": "Rioja",
+            "grape": "Tempranillo",
+            "sweetness": 0,  # dry
+            "body": 3,  # full-bodied
+            "wood": 0,  # unoaked
+            "acidity": 3,  # high acidity
+            "mouthfeel": 3,  # tannic
+        }
+
+    monkeypatch.setattr(scan_router, "search_web", fake_search)
+    monkeypatch.setattr(scan_router, "summarize_search", fake_summarize)
+    monkeypatch.setattr(enrich_module, "summarize_search", fake_summarize)
+    body = api.post("/api/scan/lookup", json={"name": "Something"}).json()
+    s = body["suggestion"]
+    assert s["body"] == 3
+    assert s["wood"] == 0
+    assert s["sweetness"] == 0
+    assert s["acidity"] == 3
+    assert s["mouthfeel"] == 3
+    # Out-of-range gauge values from a model are dropped, never force-fit.
+    assert all(0 <= (s.get(g) or 0) <= 3 for g in ("acidity", "sweetness", "body", "mouthfeel", "wood"))
 
 
 def test_summariser_declining_web_falls_back_without_overwriting(api, user, fake_ai, monkeypatch):

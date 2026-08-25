@@ -314,11 +314,18 @@ main {
 }
 .gauge-fill { height: 100%; background: linear-gradient(90deg, #9c6b74, var(--wine)); border-radius: 999px; }
 .gauge-row .g-val { font-size: 0.8rem; color: var(--ink-faint); text-align: right; font-variant-numeric: tabular-nums; }
-.gauge-input { display: flex; gap: 0.25rem; }
-.gauge-input button {
-  flex: 1; min-height: 34px; padding: 0; font-size: 0.8rem;
+.gauge-pick { display: flex; gap: 4px; max-width: 240px; }
+.gauge-pick .seg {
+  flex: 1; min-height: 30px; padding: 0; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--surface-2);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-.gauge-input button[aria-pressed="true"] { background: var(--wine); color: #fdf8f4; border-color: var(--wine-deep); }
+.gauge-pick .seg.on {
+  background: linear-gradient(90deg, #9c6b74, var(--wine));
+  border-color: var(--wine-deep);
+}
+.gauge-pick .seg:first-child.on { background: var(--surface-2); border-color: var(--line-strong); }
+.gauge-pick .seg:focus-visible { outline: 2px solid var(--wine); outline-offset: 1px; }
 
 /* ---------- comments ---------- */
 .comment {
