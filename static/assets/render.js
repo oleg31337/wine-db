@@ -57,13 +57,25 @@
     return wrap;
   };
 
-  /* Read-only gauge bars. Scale is 0-3 (0 = "no such taste"). */
+  /* Read-only gauge bars. Scale is 0-3 (0 = "no such taste", shown as all
+   * empty cells; no number/dash is printed, per request). Renders as a row of
+   * 3 segmented cells that fill left to right. */
   W.gaugeBars = function (wine) {
     var rows = W.GAUGES.map(function (pair) {
       var key = pair[0];
       var raw = wine[key];
       var has = raw !== null && raw !== undefined;
-      var pct = has ? (Number(raw) / 3) * 100 : 0;
+      var level = has ? Number(raw) : 0;
+
+      var cells = [];
+      for (var i = 1; i <= 3; i++) {
+        cells.push(
+          el("span", {
+            class: "g-cell" + (has && i <= level ? " on" : ""),
+            "aria-hidden": "true",
+          })
+        );
+      }
       return el("div", { class: "gauge-row" }, [
         el("span", { class: "g-label", text: pair[1] }),
         el(
@@ -73,12 +85,11 @@
             role: "meter",
             "aria-valuemin": "0",
             "aria-valuemax": "3",
-            "aria-valuenow": has ? String(raw) : "0",
-            "aria-label": pair[1],
+            "aria-valuenow": has ? String(level) : "",
+            "aria-label": pair[1] + (has ? ": " + level + " of 3" : ": not assessed"),
           },
-          [el("div", { class: "gauge-fill", style: "width:" + pct + "%" })]
+          cells
         ),
-        el("span", { class: "g-val", text: has ? raw + "/3" : "–" }),
       ]);
     });
     return el("div", { class: "gauges" }, rows);
