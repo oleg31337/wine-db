@@ -196,7 +196,10 @@
 
   /* Send the photo to the server for vision + internet enrichment. */
   function analyze(blob) {
-    capturedBlob = blob;
+    // The back label is scanned for its TEXT only; the wine picture in the
+    // database must stay the FRONT label, so never let a back-label capture
+    // overwrite the captured photo.
+    if (!isBackLabel) capturedBlob = blob;
     showPreview(blob);
     var panel = $("#suggest-panel");
     panel.classList.remove("hidden");
@@ -208,7 +211,7 @@
     // request-body limit (and uploads quickly). The original may be several MB.
     resizeImageBlob(blob, 1600, 0.82)
       .then(function (resized) {
-        capturedBlob = resized;
+        if (!isBackLabel) capturedBlob = resized;
         if (resized && resized.size > 10 * 1024 * 1024) {
           W.clear(panel).appendChild(
             el("div", { class: "card" }, [
@@ -383,7 +386,8 @@
             reset();
             W.toast("“" + wine.name + "” added", "ok");
             if (refreshHook) refreshHook();
-            W.openWine(wine.id, W.me, refreshHook);
+            // Return to Browse so the new wine shows up in the list.
+            W.switchView("browse");
           })
           .catch(function (err) {
             save.disabled = false;

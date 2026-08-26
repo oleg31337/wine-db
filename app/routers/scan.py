@@ -87,6 +87,13 @@ async def _enrich_from_context(
     ]
     query = " ".join(b for b in query_bits if b).strip()
     web_context, web_sources = await search_web(settings, query) if query else ("", [])
+    # SAQ (saq.com) is a large wine catalogue; run a site-scoped search alongside
+    # the general one so its structured product pages are also considered.
+    if query:
+        saq_context, saq_sources = await search_web(settings, query + " site:saq.com")
+        if saq_context:
+            web_context = (web_context + "\n" + saq_context).strip()
+            web_sources = web_sources + saq_sources
     if web_context:
         sources.extend(web_sources)
         confidence = "medium"

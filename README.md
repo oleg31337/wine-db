@@ -90,6 +90,17 @@ facts (grape, region, country, alcohol, sugar) are merged into the fields.
   *"full-bodied"* or *"oaked"*, those words are mapped onto the 0–3 scale
   automatically. You can always adjust them on the card.
 
+### Front label is the wine photo
+When you scan the **front and back** labels, only the **front** label photo is
+saved as the wine's picture. The back label is read for its text (region,
+grape, alcohol, sugar) and merged into the card, but its image is never stored
+as the wine photo.
+
+### Web search includes SAQ
+Internet lookups also run a **site-scoped search on saq.com** (a large wine
+catalogue) in addition to the general web search, so structured product data
+from SAQ is folded into the suggestion.
+
 ### How images are handled
 
 - **In the browser:** photos are downscaled (≤1600px JPEG) *before* upload so
