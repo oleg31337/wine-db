@@ -169,3 +169,60 @@ def test_photo_traversal_is_blocked(settings):
             assert exc.status_code == 404
         else:
             raise AssertionError(f"traversal not blocked for {evil}")
+
+
+# ----------------------------------------------------- format-agnostic ingest
+def test_all_incoming_formats_normalise_to_jpeg():
+    """Web-sourced images arrive in many formats (AVIF/WebP/GIF/BMP/TIFF/ICO);
+    every one must be accepted and converted to the canonical JPEG."""
+    from app.services.images import normalize_ingested_image
+
+    for fmt in ("PNG", "WEBP", "GIF", "BMP", "TIFF", "ICO", "AVIF"):
+        raw = make_image(size=(1200, 900), fmt=fmt)
+        ai_bytes, store_bytes = normalize_ingested_image(raw, 8 * 1024 * 1024)
+        ai = Image.open(io.BytesIO(ai_bytes))
+        store = Image.open(io.BytesIO(store_bytes))
+        assert ai.format == "JPEG", f"{fmt} AI copy not JPEG: {ai.format}"
+        assert store.format == "JPEG", f"{fmt} store copy not JPEG: {store.format}"
+
+
+def test_png_with_alpha_flattens_to_rgb_jpeg():
+    """Transparency in a PNG source must be flattened (JPEG has no alpha)."""
+    from app.services.images import normalize_ingested_image
+
+    buf = io.BytesIO()
+    Image.new("RGBA", (500, 400), (10, 20, 30, 128)).save(buf, format="PNG")
+    ai_bytes, store_bytes = normalize_ingested_image(buf.getvalue(), 8 * 1024 * 1024)
+    assert Image.open(io.BytesIO(store_bytes)).mode == "RGB"
+
+
+def test_stored_database_images_share_format_and_resolution():
+    """The canonical contract: all images persisted in the DB are JPEG and
+    capped at the same maximum resolution, regardless of source format."""
+    from app.services.images import (
+        AI_DIMENSION,
+        STORE_DIMENSION,
+        normalize_ingested_image,
+    )
+
+    for fmt in ("JPEG", "PNG", "WEBP", "AVIF", "GIF", "BMP", "TIFF"):
+        raw = make_image(size=(2000, 1500), fmt=fmt)
+        _ai_bytes, store_bytes = normalize_ingested_image(raw, 20 * 1024 * 1024)
+        store = Image.open(io.BytesIO(store_bytes))
+        # Uniform: every stored image is JPEG and at most STORE_DIMENSION.
+        assert store.format == "JPEG"
+        assert max(store.size) <= STORE_DIMENSION
+        # The AI copy (sent to the vision model) is also JPEG and uniform.
+        ai = Image.open(io.BytesIO(_ai_bytes))
+        assert ai.format == "JPEG"
+        assert max(ai.size) <= AI_DIMENSION
+
+
+def test_webp_image_uploaded_via_api_becomes_jpeg(api, user):
+    """End-to-end: a WebP upload through the API is stored as JPEG."""
+    wine = create_wine(api)
+    resp = upload(api, wine["id"], make_image(fmt="WEBP"), "l.webp", "image/webp")
+    assert resp.status_code == 200
+    photo = api.get(f"/api/wines/{wine['id']}/photo")
+    assert photo.headers["content-type"] == "image/jpeg"
+    assert Image.open(io.BytesIO(photo.content)).format == "JPEG"

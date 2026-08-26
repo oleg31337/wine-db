@@ -337,7 +337,7 @@ async def upload_photo(
     settings: Settings = Depends(get_settings),
 ) -> WineOut:
     raw = await images.read_upload(file, settings.max_upload_bytes)
-    _ai_bytes, normalized = images.normalize_image(raw, settings.max_upload_bytes)
+    _ai_bytes, normalized = images.normalize_ingested_image(raw, settings.max_upload_bytes)
     wine = _get_wine(db, wine_id)
     old = wine.photo_path
     wine.photo_path = images.store_photo(settings.uploads_dir, normalized)

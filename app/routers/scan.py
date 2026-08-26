@@ -169,7 +169,7 @@ async def scan_label(
     settings: Settings = Depends(get_settings),
 ) -> EnrichResponse:
     raw = await images.read_upload(file, settings.max_upload_bytes)
-    ai_bytes, _store_bytes = images.normalize_image(raw, settings.max_upload_bytes)
+    ai_bytes, _store_bytes = images.normalize_ingested_image(raw, settings.max_upload_bytes)
 
     if barcode and not barcode.isdigit():
         raise HTTPException(

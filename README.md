@@ -115,15 +115,23 @@ contributes nothing and the general Wikipedia fallback still enriches the wine.
 
 ### How images are handled
 
-- **In the browser:** all photos — label scans *and* manual uploads on the wine
+- **One canonical format & resolution.** *Every* image that enters the system —
+  uploaded from a phone, pasted, or fetched from a web page — is re-encoded
+  through Pillow to **JPEG** at a single maximum resolution per role:
+    - **AI copy** (≤1600px) is sent to the vision model for accurate label OCR.
+    - **Stored copy** (≤800px) is persisted and shown in the ~260px detail
+      frame and the 62×82 mini-card.
+  Because both copies are always JPEG, **all images stored in the database
+  share the same format and the same maximum resolution**, regardless of whether
+  they arrived as JPEG, PNG, WebP, AVIF, GIF, BMP, TIFF, HEIC, ICO, or MPO.
+  Alpha/transparency is flattened and EXIF is stripped on the way through.
+- **In the browser:** photos — label scans *and* manual uploads on the wine
   card — are downscaled (≤1600px JPEG) *before* upload so they clear the
   reverse proxy's request-body limit and upload fast. (If the browser can't
   resize, the original is sent, so the proxy limit below is your safety net.)
-- **Sent to the AI:** a high-resolution copy (≤1600px) for accurate OCR.
-- **Stored on disk:** a smaller display copy (≤800px) — the photo only ever
-  shows in a ~260px detail frame and a 62×82 mini-card, so the extra pixels
-  would be wasted disk and bandwidth. All images are re-encoded through Pillow,
-  which strips EXIF and rejects non-image payloads.
+- **Sent to the AI:** the high-resolution JPEG copy above.
+- **Stored on disk:** the smaller display copy. All images are re-encoded
+  through Pillow, which rejects non-image payloads (SVG/HTML/polyglots).
 
 ---
 
