@@ -156,8 +156,14 @@
   W.miniCard = function (wine, onOpen) {
     var thumb = el("div", { class: "mini-thumb" });
     if (wine.photo_url) {
+      // Cache-bust the thumb so a re-uploaded photo actually re-renders. The
+      // backend serves photos with a 1-day Cache-Control, and the URL itself
+      // never changes (it's /api/wines/{id}/photo), so without this the browser
+      // keeps showing the old image. updated_at changes on every save, including
+      // a photo swap.
+      var v = wine.updated_at ? String(wine.updated_at).replace(/[^0-9]/g, "") : Date.now();
       thumb.appendChild(
-        el("img", { src: wine.photo_url, alt: "", loading: "lazy", decoding: "async" })
+        el("img", { src: wine.photo_url + "?v=" + v, alt: "", loading: "lazy", decoding: "async" })
       );
     } else {
       thumb.appendChild(el("span", { text: "🍷", "aria-hidden": "true" }));
