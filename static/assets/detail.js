@@ -226,16 +226,20 @@
       photoInput.addEventListener("change", function () {
         var file = photoInput.files && photoInput.files[0];
         if (!file) return;
-        var fd = new FormData();
-        fd.append("file", file, file.name || "photo.jpg");
-        W.toast("Uploading photo…");
-        W.api
-          .put("/api/wines/" + wine.id + "/photo", { form: fd })
-          .then(function () {
-            W.toast("Photo updated", "ok");
-            refresh();
-          })
-          .catch(W.errToast);
+        W.toast("Preparing photo…");
+        // Resize in-browser so the upload clears the reverse proxy body limit.
+        W.resizeImageBlob(file, 1600, 0.82).then(function (resized) {
+          var fd = new FormData();
+          fd.append("file", resized, file.name || "photo.jpg");
+          W.toast("Uploading photo…");
+          W.api
+            .put("/api/wines/" + wine.id + "/photo", { form: fd })
+            .then(function () {
+              W.toast("Photo updated", "ok");
+              refresh();
+            })
+            .catch(W.errToast);
+        });
       });
 
       var myRating = W.starInput(

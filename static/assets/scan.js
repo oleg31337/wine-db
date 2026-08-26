@@ -35,43 +35,9 @@
   // Phone camera photos are often several MB; the reverse proxy in front of
   // the app usually caps request bodies well below that (nginx defaults to
   // 1 MB). Resize/transcode the image in the browser before upload so it
-  // clears typical body-size limits and uploads fast.
+  // clears typical body-size limits and uploads fast. (Shared helper in core.js.)
   function resizeImageBlob(blob, maxDim, quality) {
-    maxDim = maxDim || 1600;
-    quality = quality || 0.82;
-    return new Promise(function (resolve) {
-      if (!window.createImageBitmap || !window.HTMLCanvasElement) {
-        resolve(blob); // fall back to the original if canvas isn't available
-        return;
-      }
-      var url = URL.createObjectURL(blob);
-      createImageBitmap(blob)
-        .then(function (bmp) {
-          URL.revokeObjectURL(url);
-          var w = bmp.width,
-            h = bmp.height;
-          var scale = Math.min(1, maxDim / Math.max(w, h));
-          var tw = Math.max(1, Math.round(w * scale));
-          var th = Math.max(1, Math.round(h * scale));
-          var canvas = document.createElement("canvas");
-          canvas.width = tw;
-          canvas.height = th;
-          var ctx = canvas.getContext("2d");
-          ctx.drawImage(bmp, 0, 0, tw, th);
-          bmp.close && bmp.close();
-          canvas.toBlob(
-            function (out) {
-              resolve(out || blob);
-            },
-            "image/jpeg",
-            quality
-          );
-        })
-        .catch(function () {
-          URL.revokeObjectURL(url);
-          resolve(blob);
-        });
-    });
+    return W.resizeImageBlob(blob, maxDim, quality);
   }
 
   function stopCamera() {

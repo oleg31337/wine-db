@@ -103,8 +103,10 @@ from SAQ is folded into the suggestion.
 
 ### How images are handled
 
-- **In the browser:** photos are downscaled (≤1600px JPEG) *before* upload so
-  they clear the reverse proxy's request-body limit and upload fast.
+- **In the browser:** all photos — label scans *and* manual uploads on the wine
+  card — are downscaled (≤1600px JPEG) *before* upload so they clear the
+  reverse proxy's request-body limit and upload fast. (If the browser can't
+  resize, the original is sent, so the proxy limit below is your safety net.)
 - **Sent to the AI:** a high-resolution copy (≤1600px) for accurate OCR.
 - **Stored on disk:** a smaller display copy (≤800px) — the photo only ever
   shows in a ~260px detail frame and a 62×82 mini-card, so the extra pixels

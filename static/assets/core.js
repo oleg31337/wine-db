@@ -294,4 +294,43 @@
   ];
   W.TYPES = ["red", "white", "rose", "sparkling", "other"];
   W.COMMENT_MAX = 4000;
+
+  /* Downscale/transcode an image blob in-browser so uploads clear the reverse
+     proxy's request-body limit (nginx 1 MB / caddy 10 MB defaults) and go fast.
+     Returns a JPEG blob of at most maxDim px on its longest side. Used by both
+     the scan flow and the manual photo upload on the detail card. */
+  W.resizeImageBlob = function (blob, maxDim, quality) {
+    maxDim = maxDim || 1600;
+    quality = quality || 0.82;
+    return new Promise(function (resolve) {
+      if (!window.createImageBitmap || !window.HTMLCanvasElement) {
+        resolve(blob); // can't resize; send as-is
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      createImageBitmap(blob)
+        .then(function (bitmap) {
+          URL.revokeObjectURL(url);
+          var w = bitmap.width, h = bitmap.height;
+          var scale = Math.min(1, maxDim / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(bitmap, 0, 0, cw, ch);
+          bitmap.close && bitmap.close();
+          canvas.toBlob(
+            function (out) { resolve(out || blob); },
+            "image/jpeg",
+            quality
+          );
+        })
+        .catch(function () {
+          URL.revokeObjectURL(url);
+          resolve(blob); // decoding failed; send as-is
+        });
+    });
+  };
 })();
