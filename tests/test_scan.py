@@ -447,6 +447,85 @@ def test_duckduckgo_search_returns_real_results(monkeypatch):
     assert all("duckduckgo.com/y.js" not in s for s in sources)
 
 
+class _FakeResp:
+    def __init__(self, payload):
+        self._payload = payload
+        self.status_code = 200
+        self.text = ""
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._payload
+
+
+def test_wikipedia_fallback_fills_context_when_primary_empty(monkeypatch):
+    """When the primary engine (DuckDuckGo) yields nothing, search_web falls
+    back to Wikipedia and returns real encyclopedic context + a source."""
+    import asyncio
+    import httpx
+
+    # Simulate DuckDuckGo returning an empty anti-bot page.
+    async def fake_ddg(settings, query):
+        return "", []
+
+    async def fake_wiki(settings, query):
+        return "- Château Margaux: a Bordeaux wine estate in France.", [
+            "https://en.wikipedia.org/wiki/Ch%C3%A2teau_Margaux"
+        ]
+
+    monkeypatch.setattr(enrich_module, "_duckduckgo_search", fake_ddg)
+    monkeypatch.setattr(enrich_module, "_wikipedia_search", fake_wiki)
+    ctx, sources = asyncio.run(
+        enrich_module.search_web(
+            __import__("app.config", fromlist=["Settings"]).Settings(web_search_enabled=True),
+            "Chateau Margaux",
+        )
+    )
+    assert "Château Margaux" in ctx
+    assert any("wikipedia.org" in s for s in sources)
+
+
+def test_wikipedia_search_parses_api(monkeypatch):
+    """_wikipedia_search parses the search + extracts API into context."""
+    import asyncio
+    import httpx
+
+    calls = {}
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None, headers=None):
+            calls.setdefault("urls", []).append(url)
+            if params.get("list") == "search":
+                return _FakeResp(
+                    {"query": {"search": [{"title": "Château Margaux"}]}}
+                )
+            return _FakeResp(
+                {"query": {"pages": {"1": {"extract": "Château Margaux is a Bordeaux wine estate in France."}}}}
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    ctx, sources = asyncio.run(
+        enrich_module._wikipedia_search(
+            __import__("app.config", fromlist=["Settings"]).Settings(web_search_enabled=True),
+            "Chateau Margaux",
+        )
+    )
+    assert "Bordeaux" in ctx
+    assert sources and "Château_Margaux" in sources[0]
+    assert "api.php" in calls["urls"][0]
+
+
 def test_grape_infers_wine_type():
     """A grape with no explicit type still yields a valid wine_type."""
     got = enrich_module._coerce({"grape": "Sauvignon Blanc", "country": "New Zealand"})

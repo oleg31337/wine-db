@@ -526,18 +526,103 @@ async def _searxng_search(settings: Settings, query: str) -> tuple[str, list[str
     return "\n".join(lines), sources
 
 
-async def search_web(settings: Settings, query: str) -> tuple[str, list[str]]:
+async def search_web(
+    settings: Settings, query: str
+) -> tuple[str, list[str]]:
     """Internet lookup for wine details -> (raw_context_text, sources).
 
     Uses a real search engine (DuckDuckGo HTML by default, or a self-hosted
-    SearxNG if configured). The structured extraction is done afterwards by the
-    local summariser model, so the context is left as raw evidence.
+    SearxNG if configured). DuckDuckGo's HTML endpoint is increasingly gated by
+    an anti-bot challenge (HTTP 202 with no results), so when the primary engine
+    yields nothing we fall back to Wikipedia's keyless API - it reliably returns
+    real encyclopedic wine facts. The structured extraction is done afterwards
+    by the local summariser model, so the context is left as raw evidence.
+
+    Site-scoped queries (e.g. "... site:saq.com") skip the Wikipedia fallback -
+    a literal "site:saq.com" would otherwise pollute the fallback with irrelevant
+    hits, and SAQ has no public API, so those queries simply contribute nothing
+    when the primary engine is unavailable.
     """
     if not (settings.web_search_enabled and query.strip()):
         return "", []
+
     if settings.searxng_base_url:
-        return await _searxng_search(settings, query)
-    return await _duckduckgo_search(settings, query)
+        primary_ctx, primary_src = await _searxng_search(settings, query)
+    else:
+        primary_ctx, primary_src = await _duckduckgo_search(settings, query)
+
+    # DuckDuckGo returns a 202 anti-bot page with no anchors -> empty context.
+    # Fall back to Wikipedia so the enrichment stage still gets real data. Skip
+    # the fallback for site-scoped queries (e.g. "site:saq.com") so we don't
+    # search Wikipedia for the literal "site:saq.com".
+    if "site:" not in query and not primary_ctx.strip():
+        wiki_ctx, wiki_src = await _wikipedia_search(settings, query)
+        if wiki_ctx.strip():
+            return wiki_ctx, wiki_src
+    return primary_ctx, primary_src
+
+
+async def _wikipedia_search(settings: Settings, query: str) -> tuple[str, list[str]]:
+    """Keyless Wikipedia fallback: search, then pull the lead extract of the
+    top hit. Returns (context_text, sources) with no API key required."""
+    q = query.strip()
+    if not q:
+        return "", []
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.web_search_timeout_seconds, follow_redirects=True
+        ) as client:
+            # 1) Find the best-matching article title.
+            search_resp = await client.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": q,
+                    "srlimit": 3,
+                    "format": "json",
+                },
+                headers={
+                    "User-Agent": "wine-db/1.0 (self-hosted wine catalogue; +https://github.com/NousResearch/hermes-agent)"
+                },
+            )
+            search_resp.raise_for_status()
+            hits = (search_resp.json().get("query") or {}).get("search") or []
+            if not hits:
+                return "", []
+            title = hits[0]["title"]
+
+            # 2) Pull the lead extract (plaintext) of that article.
+            ext_resp = await client.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "prop": "extracts",
+                    "exintro": "1",
+                    "explaintext": "1",
+                    "titles": title,
+                    "redirects": "1",
+                    "format": "json",
+                },
+                headers={
+                    "User-Agent": "wine-db/1.0 (self-hosted wine catalogue; +https://github.com/NousResearch/hermes-agent)"
+                },
+            )
+            ext_resp.raise_for_status()
+            pages = (ext_resp.json().get("query") or {}).get("pages") or {}
+            extract = ""
+            for page in pages.values():
+                extract = (page.get("extract") or "").strip()
+                if extract:
+                    break
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        logger.info("Wikipedia search failed: %s", exc)
+        return "", []
+
+    if not extract:
+        return "", []
+    source = "https://en.wikipedia.org/wiki/" + title.replace(" ", "_")
+    return f"- {title}: {extract[:1200]}", [source]
 
 
 _SUMMARY_PROMPT = (

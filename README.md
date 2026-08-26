@@ -55,7 +55,18 @@ interface never sees or sets any of it. Highlights:
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` | Seeds the only admin account. Production refuses to boot without them. |
 | `OLLAMA_BASE_URL` / `VISION_MODEL` | Local vision model that reads labels. |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | Optional OpenAI-compatible endpoint (wins over Ollama when set). |
-| `WEB_SEARCH_ENABLED` | Enriches wines with web data (DuckDuckGo by default, or SearXNG). |
+### Web search & enrichment
+Internet lookups run a general web search and, if that returns nothing (DuckDuckGo's
+unauthenticated HTML endpoint is increasingly gated by an anti-bot challenge),
+fall back to **Wikipedia's keyless API** for real encyclopedic wine facts. A
+`WEB_SEARCH_PROVIDER=searxng` + `SEARXNG_BASE_URL` setup uses your own instance
+instead. Set `WEB_SEARCH_ENABLED=false` to disable web enrichment entirely. A
+`site:saq.com` scoped query is also attempted, but SAQ has no public API, so it
+only contributes when the primary engine is reachable.
+
+| `WEB_SEARCH_ENABLED` | Enriches wines with web data (DuckDuckGo → Wikipedia fallback, or SearXNG). |
+| `WEB_SEARCH_PROVIDER` | `duckduckgo` (default) or `searxng`. |
+| `SEARXNG_BASE_URL` | Your self-hosted SearXNG instance (used when provider is `searxng`). |
 | `MAX_UPLOAD_BYTES` | Photo ceiling (default 8 MiB). |
 | `DATA_DIR` / `PG_DATA_DIR` | Host folders for app state and the database — **back these up**. |
 
@@ -97,9 +108,10 @@ grape, alcohol, sugar) and merged into the card, but its image is never stored
 as the wine photo.
 
 ### Web search includes SAQ
-Internet lookups also run a **site-scoped search on saq.com** (a large wine
-catalogue) in addition to the general web search, so structured product data
-from SAQ is folded into the suggestion.
+A **`site:saq.com`** scoped query is also sent to the search engine so SAQ's
+product pages are considered when the engine is reachable. SAQ has no public API,
+so if the primary engine (DuckDuckGo/SearXNG) is unavailable, that query simply
+contributes nothing and the general Wikipedia fallback still enriches the wine.
 
 ### How images are handled
 

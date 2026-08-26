@@ -87,8 +87,11 @@ async def _enrich_from_context(
     ]
     query = " ".join(b for b in query_bits if b).strip()
     web_context, web_sources = await search_web(settings, query) if query else ("", [])
-    # SAQ (saq.com) is a large wine catalogue; run a site-scoped search alongside
-    # the general one so its structured product pages are also considered.
+    # SAQ (saq.com) is a large wine catalogue; try a site-scoped search
+    # alongside the general one so its product pages are also considered when
+    # the engine supports it. No Wikipedia fallback here (a bare "site:saq.com"
+    # would pollute the fallback), and SAQ has no public API, so this simply
+    # contributes nothing when the primary engine is unavailable.
     if query:
         saq_context, saq_sources = await search_web(settings, query + " site:saq.com")
         if saq_context:
