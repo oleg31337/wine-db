@@ -179,6 +179,22 @@ def test_average_combines_users_but_my_rating_is_personal(api, user, second_user
     assert {r["username"] for r in detail["ratings"]} == {"taster", "second"}
 
 
+def test_detail_lists_each_users_star_rating(api, user, second_user):
+    """The wine card shows every user's rating with their name, so the detail
+    endpoint must return each rating's username AND stars."""
+    wine = create_wine(api)
+    api.put("/api/wines/" + wine["id"] + "/rating", json={"stars": 5})
+    assert login(api, "second").status_code == 200
+    api.put("/api/wines/" + wine["id"] + "/rating", json={"stars": 2})
+
+    detail = api.get("/api/wines/" + wine["id"]).json()
+    by_user = {r["username"]: r["stars"] for r in detail["ratings"]}
+    assert by_user == {"taster": 5, "second": 2}
+    # Every rating entry carries both fields the card renders.
+    for r in detail["ratings"]:
+        assert "username" in r and "stars" in r
+
+
 # --------------------------------------------------------------- comments
 def test_comment_of_1000_plus_characters_is_accepted(api, user):
     wine = create_wine(api)

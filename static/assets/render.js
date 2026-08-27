@@ -173,13 +173,8 @@
     var foot = [
       el("span", { class: "badge " + wine.wine_type, text: W.fmt.typeLabel(wine.wine_type) }),
       wine.vintage ? el("span", { class: "badge badge-year", text: String(wine.vintage) }) : null,
+      // Combined star rating only - no numeric value after the stars.
       W.stars(wine.my_rating || wine.average_rating || 0),
-      wine.rating_count
-        ? el("span", {
-            class: "rating-count",
-            text: (wine.average_rating || 0).toFixed(1) + " · " + wine.rating_count,
-          })
-        : null,
     ];
 
     return el(

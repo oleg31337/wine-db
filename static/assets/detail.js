@@ -327,6 +327,22 @@
           el("div", { class: "pill-row" }, [myRating, el("span", { class: "muted", text: avgText })]),
         ]),
 
+        el("div", { class: "card", style: "margin-top:1rem" }, [
+          el("h3", { text: "Ratings (" + (wine.ratings || []).length + ")" }),
+          (wine.ratings || []).length
+            ? el(
+                "ul",
+                { class: "rating-list" },
+                (wine.ratings || []).map(function (r) {
+                  return el("li", { class: "rating-row" }, [
+                    el("span", { class: "rating-user", text: r.username }),
+                    W.stars(r.stars),
+                  ]);
+                })
+              )
+            : el("p", { class: "muted", text: "No ratings yet" }),
+        ]),
+
         el("div", { style: "margin-top:1rem" }, [
           el("h3", { text: "Tasting comments (" + (wine.comments || []).length + ")" }),
           editor.node,

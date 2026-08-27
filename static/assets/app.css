@@ -285,6 +285,15 @@ main {
 .star-input button.on { color: var(--gold); }
 .rating-count { font-size: 0.75rem; color: var(--ink-faint); }
 
+/* Per-user ratings list on the wine card. */
+.rating-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.rating-list .rating-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0; border-bottom: 1px solid var(--line);
+}
+.rating-list .rating-row:last-child { border-bottom: 0; }
+.rating-list .rating-user { font-weight: 600; font-size: 0.9rem; min-width: 90px; }
+
 /* ---------- detail ---------- */
 .detail-top { display: grid; gap: 1rem; }
 @media (min-width: 760px) { .detail-top { grid-template-columns: 260px 1fr; } }
