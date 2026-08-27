@@ -352,6 +352,9 @@
             reset();
             W.toast("“" + wine.name + "” added", "ok");
             if (refreshHook) refreshHook();
+            // Always repaint the list so the new wine shows up, even when the
+            // card wasn't opened from Browse/Favorites (Manual Add / scan).
+            if (W.refreshBrowse) W.refreshBrowse();
             // Return to Browse so the new wine shows up in the list.
             W.switchView("browse");
           })

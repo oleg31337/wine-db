@@ -377,6 +377,9 @@
                   handle.close();
                   W.toast("Wine deleted", "ok");
                   if (typeof onChanged === "function") onChanged();
+                  // Always repaint the list so the removed wine disappears,
+                  // even when the card wasn't opened from Browse/Favorites.
+                  if (W.refreshBrowse) W.refreshBrowse();
                 })
                 .catch(W.errToast);
             });

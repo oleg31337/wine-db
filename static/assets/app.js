@@ -180,6 +180,11 @@
     if (state.currentList) openFavoriteList(state.currentList);
   }
 
+  // Guaranteed list refresh, callable from any handler (create / delete / edit)
+  // regardless of how the wine was opened. Repaints Browse and, when a
+  // favorites list is open, that list too.
+  W.refreshBrowse = refreshCurrent;
+
   function loadFacets() {
     W.api
       .get("/api/wines/facets")
