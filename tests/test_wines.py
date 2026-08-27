@@ -195,6 +195,22 @@ def test_detail_lists_each_users_star_rating(api, user, second_user):
         assert "username" in r and "stars" in r
 
 
+def test_browse_list_carries_average_and_my_rating_separately(api, user, second_user):
+    """Mini-cards show the combined average; the card shows the current user's
+    own rating. The list endpoint must expose both, and they must differ when
+    other users have rated."""
+    wine = create_wine(api)
+    api.put("/api/wines/" + wine["id"] + "/rating", json={"stars": 5})
+    assert login(api, "second").status_code == 200
+    api.put("/api/wines/" + wine["id"] + "/rating", json={"stars": 1})
+
+    listing = api.get("/api/wines").json()
+    item = next(w for w in listing["items"] if w["id"] == wine["id"])
+    assert item["average_rating"] == 3.0   # combined across users
+    assert item["my_rating"] == 1           # current user's own rating
+    assert item["average_rating"] != item["my_rating"]
+
+
 # --------------------------------------------------------------- comments
 def test_comment_of_1000_plus_characters_is_accepted(api, user):
     wine = create_wine(api)

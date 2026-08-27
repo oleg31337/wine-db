@@ -75,6 +75,73 @@
     ]);
   }
 
+  function upsertMyRating(ratings, me, stars) {
+    var list = (ratings || []).map(function (r) { return Object.assign({}, r); });
+    var found = false;
+    list.forEach(function (r) {
+      if (r.user_id === me.id) { r.stars = stars; found = true; }
+    });
+    if (!found) list.push({ user_id: me.id, username: me.username, stars: stars });
+    return list;
+  }
+
+  // "Your rating" picker + per-user "Ratings" list. Returns { node, update(wine) }
+  // so a rating click repaints instantly (no full-card rebuild, no waiting on
+  // the server) while the API call syncs the server truth in the background.
+  function ratingsBlock(wine, onPick, onClear) {
+    var picker = W.starInput(wine.my_rating, onPick, onClear);
+
+    var yourText = el("span", { class: "muted" });
+    function paintYour() {
+      yourText.textContent = wine.my_rating
+        ? "You rated " + wine.my_rating + " / 5"
+        : "You haven't rated this wine yet";
+    }
+    paintYour();
+
+    var list = el("div");
+    function paintList() {
+      var ratings = wine.ratings || [];
+      W.clear(list).appendChild(
+        ratings.length
+          ? el(
+              "ul",
+              { class: "rating-list" },
+              ratings.map(function (r) {
+                return el("li", { class: "rating-row" }, [
+                  el("span", { class: "rating-user", text: r.username }),
+                  W.stars(r.stars),
+                ]);
+              })
+            )
+          : el("p", { class: "muted", text: "No ratings yet" })
+      );
+    }
+    paintList();
+
+    var node = el("div", {}, [
+      el("div", { class: "card", style: "margin-top:1rem" }, [
+        el("h3", { text: "Your rating" }),
+        el("div", { class: "pill-row" }, [picker, yourText]),
+      ]),
+      el("div", { class: "card", style: "margin-top:1rem" }, [
+        el("h3", { text: "Ratings (" + (wine.ratings || []).length + ")" }),
+        list,
+      ]),
+    ]);
+
+    // Re-render from a (possibly locally-mutated) wine object, in place.
+    function update(updated) {
+      wine = updated;
+      var fresh = W.starInput(wine.my_rating, onPick, onClear);
+      picker.replaceWith(fresh);
+      picker = fresh;
+      paintYour();
+      paintList();
+    }
+    return { node: node, update: update };
+  }
+
   function commentEditor(initial, onSave) {
     var box = el("textarea", {
       maxlength: String(W.COMMENT_MAX),
@@ -212,6 +279,7 @@
     }
 
     function paint(wine) {
+      var current = wine;
       var head = handle.panel.querySelector(".modal-head h2");
       head.textContent = wine.name;
 
@@ -242,31 +310,30 @@
         });
       });
 
-      var myRating = W.starInput(
-        wine.my_rating,
-        function (stars) {
-          W.api
-            .put("/api/wines/" + wine.id + "/rating", { json: { stars: stars } })
-            .then(function () {
-              W.toast("Rated " + stars + "★", "ok");
-              refresh(true);
-            })
-            .catch(W.errToast);
-        },
-        function () {
-          W.api
-            .del("/api/wines/" + wine.id + "/rating")
-            .then(function () {
-              W.toast("Rating cleared", "ok");
-              refresh(true);
-            })
-            .catch(W.errToast);
-        }
-      );
-
-      var avgText = wine.rating_count
-        ? wine.average_rating.toFixed(1) + " average from " + wine.rating_count + " rating" + (wine.rating_count > 1 ? "s" : "")
-        : "No ratings yet";
+      var ratingsBlockRef;
+      function onPick(stars) {
+        current = Object.assign({}, current, {
+          my_rating: stars,
+          ratings: upsertMyRating(current.ratings, me, stars),
+        });
+        if (ratingsBlockRef) ratingsBlockRef.update(current);
+        W.api
+          .put("/api/wines/" + wine.id + "/rating", { json: { stars: stars } })
+          .then(function () { W.toast("Rated " + stars + "★", "ok"); })
+          .catch(function (err) { W.errToast(err); refresh(); });
+      }
+      function onClear() {
+        current = Object.assign({}, current, {
+          my_rating: null,
+          ratings: (current.ratings || []).filter(function (r) { return r.user_id !== me.id; }),
+        });
+        if (ratingsBlockRef) ratingsBlockRef.update(current);
+        W.api
+          .del("/api/wines/" + wine.id + "/rating")
+          .then(function () { W.toast("Rating cleared", "ok"); })
+          .catch(function (err) { W.errToast(err); refresh(); });
+      }
+      ratingsBlockRef = ratingsBlock(current, onPick, onClear);
 
       var editor = commentEditor("", function (body, done) {
         W.api
@@ -322,26 +389,7 @@
           ]),
         ]),
 
-        el("div", { class: "card", style: "margin-top:1rem" }, [
-          el("h3", { text: "Your rating" }),
-          el("div", { class: "pill-row" }, [myRating, el("span", { class: "muted", text: avgText })]),
-        ]),
-
-        el("div", { class: "card", style: "margin-top:1rem" }, [
-          el("h3", { text: "Ratings (" + (wine.ratings || []).length + ")" }),
-          (wine.ratings || []).length
-            ? el(
-                "ul",
-                { class: "rating-list" },
-                (wine.ratings || []).map(function (r) {
-                  return el("li", { class: "rating-row" }, [
-                    el("span", { class: "rating-user", text: r.username }),
-                    W.stars(r.stars),
-                  ]);
-                })
-              )
-            : el("p", { class: "muted", text: "No ratings yet" }),
-        ]),
+        ratingsBlockRef.node,
 
         el("div", { style: "margin-top:1rem" }, [
           el("h3", { text: "Tasting comments (" + (wine.comments || []).length + ")" }),
