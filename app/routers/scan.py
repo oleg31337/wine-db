@@ -1,7 +1,7 @@
 """Scanning & enrichment.
 
 `POST /api/scan/label`  - photo of the (front or back) label -> suggested fields
-`POST /api/scan/lookup` - barcode / typed name -> suggested fields
+`POST /api/scan/lookup` - typed name -> suggested fields
 
 The response only ever contains SUGGESTIONS. Nothing is written to the database
 here, and fields the caller already filled in are stripped from the suggestion so
@@ -26,7 +26,6 @@ from app.services.enrich import (
     AIClient,
     EnrichmentError,
     _coerce,
-    lookup_barcode,
     search_web,
     summarize_search,
 )
@@ -61,7 +60,6 @@ def _filled_fields(form_values: dict) -> set[str]:
 async def _enrich_from_context(
     settings: Settings,
     *,
-    barcode: str | None,
     hints: dict,
     label_text: str | None,
     sources: list[str],
@@ -70,14 +68,6 @@ async def _enrich_from_context(
     """Internet first, then the model's own knowledge."""
     suggestion: dict = {}
     confidence = "low"
-
-    if barcode:
-        fields, src = await lookup_barcode(settings, barcode)
-        if fields:
-            suggestion.update(fields)
-            sources.extend(src)
-            confidence = "medium"
-            messages.append("Matched the barcode in the Open Food Facts database.")
 
     query_bits = [
         str(hints.get("name") or ""),
@@ -125,8 +115,6 @@ async def _enrich_from_context(
         # ratings/comments.
         if not suggestion:
             context_lines = [f"{k}: {v}" for k, v in hints.items() if v]
-            if barcode:
-                context_lines.append(f"barcode: {barcode}")
             if web_context:
                 context_lines.append(f"web search results:\n{web_context}")
             if label_text:
@@ -156,7 +144,6 @@ async def _enrich_from_context(
 @router.post("/label", response_model=EnrichResponse)
 async def scan_label(
     file: UploadFile = File(...),
-    barcode: str | None = Form(default=None, max_length=64),
     name: str | None = Form(default=None, max_length=200),
     maker: str | None = Form(default=None, max_length=200),
     country: str | None = Form(default=None, max_length=100),
@@ -170,11 +157,6 @@ async def scan_label(
 ) -> EnrichResponse:
     raw = await images.read_upload(file, settings.max_upload_bytes)
     ai_bytes, _store_bytes = images.normalize_ingested_image(raw, settings.max_upload_bytes)
-
-    if barcode and not barcode.isdigit():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Barcode must be digits only"
-        )
 
     filled_form = {
         "name": name,
@@ -224,7 +206,6 @@ async def scan_label(
 
     net_suggestion, confidence = await _enrich_from_context(
         settings,
-        barcode=barcode,
         hints=hints,
         label_text=label_text,
         sources=sources,
@@ -264,15 +245,11 @@ async def scan_lookup(
     _: None = Depends(require_csrf),
     settings: Settings = Depends(get_settings),
 ) -> EnrichResponse:
-    """Barcode-only or typed-name lookup, no photo needed."""
-    if payload.barcode and not payload.barcode.isdigit():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Barcode must be digits only"
-        )
-    if not any([payload.barcode, payload.name, payload.maker, payload.label_text]):
+    """Typed-name or label-text lookup, no photo needed."""
+    if not any([payload.name, payload.maker, payload.label_text]):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Provide a barcode, a name, or label text",
+            detail="Provide a name or label text",
         )
 
     already = _filled_fields({"name": payload.name, "maker": payload.maker})
@@ -280,7 +257,6 @@ async def scan_lookup(
     messages: list[str] = []
     suggestion, confidence = await _enrich_from_context(
         settings,
-        barcode=payload.barcode,
         hints={"name": payload.name, "maker": payload.maker},
         label_text=payload.label_text,
         sources=sources,
@@ -308,5 +284,4 @@ def scan_status(
     return {
         "ai_available": ai.available,
         "web_search_enabled": settings.web_search_enabled,
-        "barcode_lookup": settings.web_search_enabled,
     }

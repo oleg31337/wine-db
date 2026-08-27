@@ -50,17 +50,12 @@ def fake_ai(monkeypatch):
 
 @pytest.fixture
 def no_network(monkeypatch):
-    async def no_barcode(settings, barcode):
-        return {}, []
-
     async def no_web(settings, query):
         return "", []
 
-    monkeypatch.setattr(enrich_module, "lookup_barcode", no_barcode)
     monkeypatch.setattr(enrich_module, "search_web", no_web)
     import app.routers.scan as scan_router
 
-    monkeypatch.setattr(scan_router, "lookup_barcode", no_barcode)
     monkeypatch.setattr(scan_router, "search_web", no_web)
 
 
@@ -88,7 +83,7 @@ def test_scan_requires_csrf(client, user):
 
 def test_status_never_exposes_backend_config(api, user):
     body = api.get("/api/scan/status").json()
-    assert set(body) == {"ai_available", "web_search_enabled", "barcode_lookup"}
+    assert set(body) == {"ai_available", "web_search_enabled"}
     raw = api.get("/api/scan/status").text
     for secret in ("11434", "http", "api_key", "token", "192.168"):
         assert secret not in raw
@@ -177,41 +172,14 @@ def test_scan_rejects_non_image(api, user, fake_ai, no_network):
     assert resp.status_code == 400
 
 
-def test_scan_rejects_bad_barcode(api, user, fake_ai, no_network):
-    assert post_label(api, barcode="abc").status_code == 422
-
-
 def test_scan_does_not_write_to_the_database(api, user, fake_ai, no_network):
     post_label(api)
     assert api.get("/api/wines").json()["total"] == 0
 
 
-# --------------------------------------------------------------- barcode lookup
-def test_barcode_lookup_uses_internet_result(api, user, fake_ai, monkeypatch):
-    async def found(settings, barcode):
-        assert barcode == "3760040370019"
-        return {"name": "Web Wine", "country": "Italy"}, ["openfoodfacts"]
-
-    async def no_web(settings, query):
-        return "", []
-
-    import app.routers.scan as scan_router
-
-    monkeypatch.setattr(scan_router, "lookup_barcode", found)
-    monkeypatch.setattr(scan_router, "search_web", no_web)
-
-    body = api.post("/api/scan/lookup", json={"barcode": "3760040370019"}).json()
-    assert body["suggestion"]["name"] == "Web Wine"
-    assert body["suggestion"]["country"] == "Italy"
-    assert "openfoodfacts" in " ".join(body["sources"])
-
-
+# --------------------------------------------------------------- typed-name lookup
 def test_lookup_requires_some_input(api, user, fake_ai, no_network):
     assert api.post("/api/scan/lookup", json={}).status_code == 422
-
-
-def test_lookup_rejects_non_numeric_barcode(api, user, fake_ai, no_network):
-    assert api.post("/api/scan/lookup", json={"barcode": "12ab"}).status_code == 422
 
 
 def test_lookup_by_name_only(api, user, fake_ai, no_network):

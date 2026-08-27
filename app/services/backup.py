@@ -92,7 +92,6 @@ def export_backup(db: Session, uploads_dir: str) -> bytes:
                 "sugar_g_l": w.sugar_g_l,
                 "alcohol_pct": w.alcohol_pct,
                 "aromas": w.aromas,
-                "barcode": w.barcode,
                 "acidity": w.acidity,
                 "sweetness": w.sweetness,
                 "body": w.body,
@@ -305,9 +304,6 @@ def import_backup(db: Session, uploads_dir: str, raw: bytes, replace: bool = Tru
     # --- wines ---
     def _wine_key(name: str, row: dict) -> tuple:
         """Identity used to avoid duplicating a wine when merging."""
-        barcode = str(row.get("barcode") or "").strip()
-        if barcode:
-            return ("barcode", barcode)
         return (
             "fields",
             name.casefold(),
@@ -318,9 +314,7 @@ def import_backup(db: Session, uploads_dir: str, raw: bytes, replace: bool = Tru
     existing_keys: dict[tuple, str] = {}
     if not replace:
         for w in db.scalars(select(Wine)):
-            existing_keys[
-                _wine_key(w.name, {"barcode": w.barcode, "maker": w.maker, "vintage": w.vintage})
-            ] = w.id
+            existing_keys[_wine_key(w.name, {"maker": w.maker, "vintage": w.vintage})] = w.id
 
     wine_map: dict[str, str] = {}
     for row in data.get("wines") or []:
@@ -364,7 +358,6 @@ def import_backup(db: Session, uploads_dir: str, raw: bytes, replace: bool = Tru
             if isinstance(row.get("alcohol_pct"), (int, float))
             else None,
             aromas=(row.get("aromas") or None),
-            barcode=(row.get("barcode") or None),
             acidity=_gauge(row.get("acidity")),
             sweetness=_gauge(row.get("sweetness")),
             body=_gauge(row.get("body")),

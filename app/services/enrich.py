@@ -3,7 +3,7 @@
 Pipeline:
   1. Read the label photo with a vision model (Ollama or any OpenAI-compatible
      endpoint configured in the backend .env).
-  2. Look the wine up on the internet (Open Food Facts barcode lookup, optional
+  2. Look the wine up on the internet (web search), optional
      SearxNG text search).
   3. If the internet has nothing, fall back to the model's own knowledge and, when
      confidence is low, ask the user to scan the BACK label.
@@ -416,41 +416,11 @@ class AIClient:
         return (choices[0].get("message") or {}).get("content", "") or ""
 
 
-async def lookup_barcode(settings: Settings, barcode: str) -> tuple[dict, list[str]]:
-    """Open Food Facts barcode lookup (free, no key). Returns (fields, sources)."""
-    if not settings.web_search_enabled or not barcode.isdigit():
-        return {}, []
-    url = f"{settings.openfoodfacts_base_url.rstrip('/')}/api/v2/product/{barcode}.json"
-    try:
-        async with httpx.AsyncClient(
-            timeout=settings.web_search_timeout_seconds, follow_redirects=False
-        ) as client:
-            resp = await client.get(url, headers={"User-Agent": "wine-db/1.0 (self-hosted)"})
-            if resp.status_code != 200:
-                return {}, []
-            data = resp.json()
-    except (httpx.HTTPError, json.JSONDecodeError, ValueError) as exc:
-        logger.info("barcode lookup failed: %s", exc)
-        return {}, []
-
-    if data.get("status") != 1:
-        return {}, []
-    product = data.get("product") or {}
-    raw = {
-        "name": product.get("product_name") or product.get("generic_name"),
-        "maker": product.get("brands"),
-        "country": (product.get("countries") or "").split(",")[0] or None,
-        "alcohol_pct": (product.get("nutriments") or {}).get("alcohol_value"),
-    }
-    fields = _coerce({k: v for k, v in raw.items() if v})
-    return fields, [f"openfoodfacts:{barcode}"] if fields else []
-
-
 async def _duckduckgo_search(settings: Settings, query: str) -> tuple[str, list[str]]:
     """Real web search via DuckDuckGo's HTML endpoint (no API key).
 
     Returns (context_text, sources). This is the primary internet source - it
-    returns general web results about the wine, not grocery barcodes.
+    returns general web results about the wine, not groceries.
     """
     q = query.strip()
     if not q:

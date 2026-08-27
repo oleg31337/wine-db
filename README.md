@@ -7,7 +7,7 @@ all behind a reverse proxy on your own hardware.
 
 - **Private & local-first** — your data stays on your server; AI runs on your
   Ollama (or any OpenAI-compatible endpoint).
-- **Label scanning** — front *and* back label OCR, barcode lookup, and web
+- **Label scanning** — front *and* back label OCR and web
   enrichment, merged into one card.
 - **Secure** — Argon2id passwords, HttpOnlyJWT cookies, CSRF protection,
   per-IP rate limiting, safe image re-encoding (EXIF stripped), strict CSP.
@@ -86,12 +86,15 @@ python -m app.tools.admin_hash "your-admin-password"
 1. Tap **Scan** and point the camera at the **front label** (or choose a photo).
 2. The app resizes the photo in your browser, sends it to the vision model, and
    pre-fills the card with what it read.
-3. **Always offered:** a *"Scan the back label"* button. The back label usually
-   carries the region, grape, alcohol and sugar that the front omits. Scanning
-   it **merges** its data into the *same* card (front data is never lost) — it
-   does not start over. This works in both automatic (camera) and manual add
-   modes.
+3. After the front label is read, a *"Scan the back label"* button is offered.
+   The back label usually carries the region, grape, alcohol and sugar that the
+   front omits. Scanning it **merges** its data into the *same* card (front
+   data is never lost) — it does not start over.
 4. Review the merged card, fill anything missing, and **Save wine**.
+
+Prefer to add a wine without the camera? On the **Add Wine** page, choose
+**"+ Add manually"** — the new card offers **"Select photo"** so you can pick a
+label image from your device; it runs through the same AI reading path.
 
 The raw back-label text is stored with the wine as provenance; the structured
 facts (grape, region, country, alcohol, sugar) are merged into the fields.

@@ -70,11 +70,6 @@ def test_gauges_must_be_zero_to_three(api, user):
         assert resp.status_code == 201
 
 
-def test_barcode_must_be_digits(api, user):
-    assert api.post("/api/wines", json=wine_payload(barcode="abc123")).status_code == 422
-    assert api.post("/api/wines", json=wine_payload(barcode="3760040370019")).status_code == 201
-
-
 def test_unknown_field_is_rejected(api, user):
     assert api.post("/api/wines", json=wine_payload(sneaky="x")).status_code == 422
 
@@ -103,7 +98,6 @@ def test_every_field_is_editable(api, user):
         "sugar_g_l": 4.5,
         "alcohol_pct": 12.0,
         "aromas": "rose petal, tar",
-        "barcode": "1234567890123",
         "acidity": 3,
         "sweetness": 0,
         "body": 2,

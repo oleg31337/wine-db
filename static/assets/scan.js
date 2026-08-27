@@ -1,14 +1,13 @@
-/* Camera capture + barcode + AI label reading -> new wine card. */
+/* Camera capture + AI label reading -> new wine card. */
 (function () {
   "use strict";
   var W = window.WineDB;
   var el = W.el;
 
   var stream = null;
-  var watcher = null;
   var facing = "environment";
   var capturedBlob = null;
-  var detectedBarcode = "";
+  var manualMode = false;
   var isBackLabel = false;
   var refreshHook = null;
   // The in-progress new-wine form. Kept at module scope so a back-label scan
@@ -41,10 +40,6 @@
   }
 
   function stopCamera() {
-    if (watcher) {
-      watcher.stop();
-      watcher = null;
-    }
     if (stream) {
       stream.getTracks().forEach(function (t) {
         t.stop();
@@ -106,19 +101,7 @@
         $("#btn-cam-stop").classList.remove("hidden");
         $("#btn-cam-flip").classList.remove("hidden");
         $("#btn-cam-start").classList.add("hidden");
-
-        if (window.WineBarcode.supported()) {
-          hint("Looking for a barcode… or capture the label.");
-          watcher = window.WineBarcode.watch(video, function (code) {
-            detectedBarcode = code;
-            $("#manual-barcode").value = code;
-            $("#barcode-status").textContent = "Barcode detected: " + code;
-            hint("Barcode " + code + " found — capture the label too, or look it up.");
-            if (navigator.vibrate) navigator.vibrate(60);
-          });
-        } else {
-          hint("Capture the label — or type the barcode by hand below.");
-        }
+        hint("Capture the label — or choose a photo below.");
       })
       .catch(function (err) {
         W.toast(
@@ -161,7 +144,7 @@
   }
 
   /* Send the photo to the server for vision + internet enrichment. */
-  function analyze(blob) {
+  function analyze(blob, manual) {
     // The back label is scanned for its TEXT only; the wine picture in the
     // database must stay the FRONT label, so never let a back-label capture
     // overwrite the captured photo.
@@ -191,7 +174,7 @@
                 class: "btn-primary",
                 text: "Fill the card by hand",
                 onclick: function () {
-                  openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] });
+                  openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] }, manual);
                 },
               }),
             ])
@@ -200,24 +183,11 @@
         }
         var fd = new FormData();
         fd.append("file", resized, "label.jpg");
-        if (detectedBarcode) fd.append("barcode", detectedBarcode);
         fd.append("is_back_label", isBackLabel ? "true" : "false");
 
-        var maybeBarcode = detectedBarcode
-          ? Promise.resolve(detectedBarcode)
-          : window.WineBarcode.detectInBlob(resized);
-
-        return maybeBarcode
-          .then(function (code) {
-            if (code && !detectedBarcode) {
-              detectedBarcode = code;
-              $("#manual-barcode").value = code;
-              fd.set("barcode", code);
-            }
-            return W.api.post("/api/scan/label", { form: fd });
-          })
+        return W.api.post("/api/scan/label", { form: fd })
           .then(function (result) {
-            openCardWithSuggestion(result);
+            openCardWithSuggestion(result, manual);
           });
       })
       .catch(function (err) {
@@ -237,7 +207,7 @@
       });
   }
 
-  function suggestionSummary(result, form) {
+  function suggestionSummary(result, form, manual) {
     var box = el("div", { class: "suggest-box" });
     var keys = Object.keys(result.suggestion || {});
     box.appendChild(
@@ -260,10 +230,43 @@
         el("p", { class: "hint", text: "Applied to empty fields only — review and correct anything wrong." })
       );
     }
-    // Always offer to also scan the back label: it usually carries the region,
-    // grape, alcohol and sugar that the front rarely lists. Skipped when we are
-    // already processing a back label.
-    if (!isBackLabel) {
+    // When adding manually, the only image action is "Select photo" (a file
+    // picker that reuses the AI label-reading path). The camera/back-label scan
+    // flow keeps the "Scan the back label" offer.
+    if (manual) {
+      box.appendChild(
+        el("div", { class: "pill-row", style: "margin-top:0.5rem" }, [
+          el("label", {
+            class: "btn-sm btn-primary",
+            for: "manual-photo",
+            style: "cursor:pointer",
+            text: "🖼 Select photo",
+          }),
+          el("input", {
+            id: "manual-photo",
+            type: "file",
+            accept: "image/*",
+            class: "sr-only",
+          }),
+        ])
+      );
+      var picker = box.querySelector("#manual-photo");
+      if (picker) {
+        picker.addEventListener("change", function (ev) {
+          var file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          if (file.size > 12 * 1024 * 1024) {
+            W.toast("That image is too large (max ~8 MB after processing).", "err");
+            return;
+          }
+          analyze(file);
+          ev.target.value = "";
+        });
+      }
+    } else if (!isBackLabel) {
+      // Always offer to also scan the back label: it usually carries the region,
+      // grape, alcohol and sugar that the front rarely lists. Skipped when we are
+      // already processing a back label.
       box.appendChild(
         el("div", { class: "pill-row", style: "margin-top:0.5rem" }, [
           el("button", {
@@ -296,7 +299,7 @@
   /* Opens the new-wine card, pre-filled with the suggestion. When a back-label
      scan returns, the SAME form (currentForm) is reused and the back suggestion
      is merged into its still-empty fields - front-label data is never lost. */
-  function openCardWithSuggestion(result) {
+  function openCardWithSuggestion(result, manual) {
     var panel = $("#suggest-panel");
     panel.classList.add("hidden");
     W.clear(panel);
@@ -312,13 +315,12 @@
       currentForm = null;
       pendingBackText = "";
       var seed = {};
-      if (detectedBarcode) seed.barcode = detectedBarcode;
       form = W.wineForm(seed);
       applied = form.applySuggestion(result.suggestion || {});
       currentForm = form;
     }
 
-    var body = el("div", {}, [suggestionSummary(result, form), el("div", { style: "height:0.9rem" }), form.node]);
+    var body = el("div", {}, [suggestionSummary(result, form, manual), el("div", { style: "height:0.9rem" }), form.node]);
 
     var save = el("button", {
       type: "button",
@@ -379,12 +381,10 @@
 
   function reset() {
     capturedBlob = null;
-    detectedBarcode = "";
     isBackLabel = false;
     currentForm = null;
     pendingBackText = "";
-    $("#manual-barcode").value = "";
-    $("#barcode-status").textContent = "";
+    manualMode = false;
     $("#scan-preview").classList.add("hidden");
     $("#suggest-panel").classList.add("hidden");
     stopCamera();
@@ -433,36 +433,15 @@
       ev.target.value = "";
     });
 
-    $("#btn-barcode-lookup").addEventListener("click", function () {
-      var code = ($("#manual-barcode").value || "").replace(/\D/g, "");
-      if (!code) {
-        W.toast("Type a barcode first", "err");
-        return;
-      }
-      detectedBarcode = code;
-      $("#barcode-status").textContent = "Looking up " + code + "…";
-      W.api
-        .post("/api/scan/lookup", { json: { barcode: code, ask_back_label: true } })
-        .then(function (result) {
-          $("#barcode-status").textContent = Object.keys(result.suggestion || {}).length
-            ? "Found details for " + code
-            : "Nothing found online for " + code;
-          openCardWithSuggestion(result);
-        })
-        .catch(function (err) {
-          $("#barcode-status").textContent = "";
-          W.errToast(err);
-        });
-    });
-
-    $("#btn-skip-to-form").addEventListener("click", function () {
-      openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] });
+    $("#btn-manual-add").addEventListener("click", function () {
+      if (W.manualAdd) W.manualAdd();
     });
 
     W.stopCamera = stopCamera;
     W.manualAdd = function () {
       reset();
-      openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] });
+      manualMode = true;
+      openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] }, true);
     };
   };
 })();

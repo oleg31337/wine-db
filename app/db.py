@@ -63,6 +63,9 @@ def init_db() -> None:
         "wines",
         {"back_label_text": "TEXT"},
     )
+    # Drop columns removed after first deploy without a full migration tool.
+    # create_all() won't touch existing tables, so prune here. Idempotent.
+    _drop_columns(engine, "wines", {"barcode"})
 
 
 def _ensure_columns(engine: Engine, table: str, columns: dict[str, str]) -> None:
@@ -74,6 +77,17 @@ def _ensure_columns(engine: Engine, table: str, columns: dict[str, str]) -> None
         for name, ddl in columns.items():
             if name not in existing:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
+def _drop_columns(engine: Engine, table: str, columns: set[str]) -> None:
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    existing = {c["name"] for c in inspector.get_columns(table)}
+    with engine.begin() as conn:
+        for name in columns:
+            if name in existing:
+                conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {name}"))
 
 
 def reset_engine() -> None:

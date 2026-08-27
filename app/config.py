@@ -84,9 +84,6 @@ class Settings(BaseSettings):
     # instance if you provide one.
     web_search_provider: str = "duckduckgo"
     searxng_base_url: str | None = None
-    # Open Food Facts is used ONLY for barcode lookups (barcoded products), not
-    # for free-text wine search, which would otherwise return groceries.
-    openfoodfacts_base_url: str = "https://world.openfoodfacts.org"
     web_search_timeout_seconds: float = 15.0
 
     # --- Security knobs ---

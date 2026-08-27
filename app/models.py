@@ -81,7 +81,6 @@ class Wine(Base):
     sugar_g_l: Mapped[float | None] = mapped_column(Float)
     alcohol_pct: Mapped[float | None] = mapped_column(Float)
     aromas: Mapped[str | None] = mapped_column(Text)
-    barcode: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Gauge bars, 0-3 (0 = "no such taste"; nullable = not assessed)
     acidity: Mapped[int | None] = mapped_column(Integer)

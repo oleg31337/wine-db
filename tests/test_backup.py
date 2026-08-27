@@ -25,7 +25,7 @@ def import_zip(api, blob, mode="merge"):
 
 
 def seeded(api):
-    wine = create_wine(api, name="Backup Bottle", barcode="1234567890123")
+    wine = create_wine(api, name="Backup Bottle")
     api.put(f"/api/wines/{wine['id']}/photo", files={"file": ("l.jpg", make_image(), "image/jpeg")})
     api.put(f"/api/wines/{wine['id']}/rating", json={"stars": 5})
     api.post(f"/api/wines/{wine['id']}/comments", json={"body": "Excellent, would buy again."})

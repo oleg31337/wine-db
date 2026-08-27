@@ -1,5 +1,5 @@
 /* The wine card editor: every field is user-editable.
- * Suggestions (from barcode / label AI) are only ever applied to EMPTY fields.
+ * Suggestions (from the label AI) are only ever applied to EMPTY fields.
  */
 (function () {
   "use strict";
@@ -34,7 +34,6 @@
         alcohol_pct: "",
         sugar_g_l: "",
         aromas: "",
-        barcode: "",
         acidity: null,
         sweetness: null,
         body: null,
@@ -96,19 +95,6 @@
       );
     });
     node.appendChild(numRow);
-
-    /* Barcode */
-    var barcode = el("input", {
-      id: "wf-barcode",
-      inputmode: "numeric",
-      maxlength: 64,
-      value: data.barcode || "",
-      placeholder: "digits only",
-    });
-    inputs.barcode = barcode;
-    node.appendChild(
-      el("div", { class: "field" }, [el("label", { for: "wf-barcode", text: "Barcode" }), barcode])
-    );
 
     /* Aromas */
     var aromas = el("textarea", {
@@ -219,7 +205,6 @@
           alcohol_pct: numOrNull(inputs.alcohol_pct),
           sugar_g_l: numOrNull(inputs.sugar_g_l),
           aromas: textOrNull(inputs.aromas),
-          barcode: textOrNull(inputs.barcode),
         };
         if (out.vintage !== null) out.vintage = Math.round(out.vintage);
         W.GAUGES.forEach(function (pair) {
@@ -230,7 +215,6 @@
       validate: function () {
         var v = this.read();
         if (!v.name) return "A name is required.";
-        if (v.barcode && !/^\d+$/.test(v.barcode)) return "Barcode must be digits only.";
         if (v.vintage !== null && (v.vintage < 1800 || v.vintage > 2200))
           return "Vintage looks wrong.";
         if (v.alcohol_pct !== null && (v.alcohol_pct < 0 || v.alcohol_pct > 100))

@@ -291,9 +291,6 @@
     $("#btn-load-more").addEventListener("click", function () {
       loadWines(true);
     });
-    $("#btn-manual-add").addEventListener("click", function () {
-      if (W.manualAdd) W.manualAdd();
-    });
   }
 
   /* ---------------- favorites ---------------- */

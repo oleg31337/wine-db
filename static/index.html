@@ -130,7 +130,6 @@
         <h2>Cellar</h2>
         <span class="muted" id="result-count"></span>
         <span class="spacer"></span>
-        <button type="button" class="btn-sm" id="btn-manual-add">+ Add manually</button>
       </div>
 
       <div id="wine-results" class="wine-grid"></div>
@@ -167,9 +166,8 @@
       <div class="card">
         <h2>Add a wine</h2>
         <p class="muted">
-          Point the camera at the bottle. The barcode is read on your phone; the label is read by
-          the AI model on the server. Everything found is only a suggestion — you stay in control
-          of every field.
+          Point the camera at the bottle. The label is read by the AI model on the server.
+          Everything found is only a suggestion — you stay in control of every field.
         </p>
 
         <div class="scan-stage" id="scan-stage">
@@ -194,18 +192,8 @@
           </label>
         </div>
 
-        <div class="field" style="margin-top:0.9rem">
-          <label for="manual-barcode">Barcode <span class="muted">(auto-filled when detected)</span></label>
-          <div class="pill-row">
-            <input id="manual-barcode" inputmode="numeric" maxlength="64"
-                   placeholder="e.g. 3760040370019" style="flex:1;min-width:160px" />
-            <button type="button" class="btn-sm" id="btn-barcode-lookup">Look up</button>
-          </div>
-          <p class="hint" id="barcode-status"></p>
-        </div>
-
         <div class="pill-row" style="margin-top:0.5rem">
-          <button type="button" id="btn-skip-to-form" class="btn-sm">Fill the card by hand →</button>
+          <button type="button" id="btn-manual-add" class="btn-sm">+ Add manually</button>
         </div>
       </div>
 
@@ -297,7 +285,6 @@
 <script src="/assets/render.js"></script>
 <script src="/assets/wineform.js"></script>
 <script src="/assets/detail.js"></script>
-<script src="/assets/barcode.js"></script>
 <script src="/assets/scan.js"></script>
 <script src="/assets/app.js"></script>
 </body>

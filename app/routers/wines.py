@@ -96,7 +96,6 @@ def to_wine_out(
         sugar_g_l=wine.sugar_g_l,
         alcohol_pct=wine.alcohol_pct,
         aromas=wine.aromas,
-        barcode=wine.barcode,
         acidity=wine.acidity,
         sweetness=wine.sweetness,
         body=wine.body,

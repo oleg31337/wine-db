@@ -14,7 +14,6 @@
       ["Grape", wine.grape || "–"],
       ["Alcohol", wine.alcohol_pct !== null && wine.alcohol_pct !== undefined ? wine.alcohol_pct + " %" : "–"],
       ["Sugar", wine.sugar_g_l !== null && wine.sugar_g_l !== undefined ? wine.sugar_g_l + " g/L" : "–"],
-      ["Barcode", wine.barcode || "–"],
     ];
     return el(
       "dl",

@@ -96,7 +96,6 @@ class WineBase(BaseModel):
     sugar_g_l: float | None = Field(default=None, ge=0, le=500)
     alcohol_pct: float | None = Field(default=None, ge=0, le=100)
     aromas: str | None = Field(default=None, max_length=2000)
-    barcode: str | None = Field(default=None, max_length=64)
     # Raw text read from the back label by the vision model. Optional; when
     # present it is merged into empty structured fields on creation (grape,
     # region, country, alcohol, sugar) so the back label enriches the card.
@@ -109,27 +108,18 @@ class WineBase(BaseModel):
     wood: int | None = Field(default=None, ge=0, le=3)
 
     @field_validator(
-        "name", "maker", "country", "region", "grape", "aromas", "barcode", mode="after"
+        "name", "maker", "country", "region", "grape", "aromas", mode="after"
     )
     @classmethod
     def _no_control_chars(cls, v: str | None) -> str | None:
         return v if v is None else _reject_control_chars(v)
 
-    @field_validator("maker", "country", "region", "grape", "aromas", "barcode", mode="after")
+    @field_validator("maker", "country", "region", "grape", "aromas", mode="after")
     @classmethod
     def _empty_to_none(cls, v: str | None) -> str | None:
         if v is None:
             return None
         return v.strip() or None
-
-    @field_validator("barcode", mode="after")
-    @classmethod
-    def _barcode_digits(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        if not v.isdigit():
-            raise ValueError("Barcode must contain digits only")
-        return v
 
 
 class WineCreate(WineBase):
@@ -151,7 +141,6 @@ class WineUpdate(BaseModel):
     sugar_g_l: float | None = Field(default=None, ge=0, le=500)
     alcohol_pct: float | None = Field(default=None, ge=0, le=100)
     aromas: str | None = Field(default=None, max_length=2000)
-    barcode: str | None = Field(default=None, max_length=64)
     acidity: int | None = Field(default=None, ge=0, le=3)
     sweetness: int | None = Field(default=None, ge=0, le=3)
     body: int | None = Field(default=None, ge=0, le=3)
@@ -188,7 +177,6 @@ class WineOut(BaseModel):
     sugar_g_l: float | None
     alcohol_pct: float | None
     aromas: str | None
-    barcode: str | None
     acidity: int | None
     sweetness: int | None
     body: int | None
@@ -257,7 +245,6 @@ class EnrichRequest(BaseModel):
     """Enrichment lookup; only empty fields will be suggested by the server."""
 
     model_config = ConfigDict(extra="forbid")
-    barcode: str | None = Field(default=None, max_length=64)
     name: str | None = Field(default=None, max_length=200)
     maker: str | None = Field(default=None, max_length=200)
     label_text: str | None = Field(default=None, max_length=4000)
