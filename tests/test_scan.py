@@ -608,3 +608,74 @@ def test_back_label_text_persisted_on_wine_create(api, user, settings):
     assert row[0] == "SYRAH 14.0% VOL"
 
 
+# ----------------------------------------------------- provider split (vision vs summary)
+def test_vision_and_summary_use_separate_providers(monkeypatch):
+    """Vision and summary stages must read their OWN base_url/api_key/model,
+    so they can run on different providers."""
+    from app.config import Settings
+
+    settings = Settings(
+        vision_base_url="https://vision.example/v1",
+        vision_api_key="vision-key",
+        vision_model="vl-model",
+        summary_base_url="https://summary.example/v1",
+        summary_api_key="summary-key",
+        summary_model="sum-model",
+    )
+    captured = {}
+
+    async def fake_openai(self, payload, base_url, api_key):
+        captured.setdefault("openai", []).append((base_url, api_key, payload.get("model")))
+        return '{"name": "ok"}'
+
+    async def fake_ollama(self, payload, base_url):
+        captured.setdefault("ollama", []).append((base_url, payload.get("model")))
+        return '{"name": "ok"}'
+
+    monkeypatch.setattr(enrich_module.AIClient, "_openai_chat", fake_openai, raising=False)
+    monkeypatch.setattr(enrich_module.AIClient, "_ollama_chat", fake_ollama, raising=False)
+
+    client = enrich_module.AIClient(settings)
+    import asyncio
+
+    asyncio.get_event_loop().run_until_complete(client.vision_label(b"img"))
+    asyncio.get_event_loop().run_until_complete(enrich_module.summarize_search(client, "ctx"))
+
+    assert captured["openai"][0] == ("https://vision.example/v1", "vision-key", "vl-model")
+    assert captured["openai"][1] == ("https://summary.example/v1", "summary-key", "sum-model")
+
+
+def test_summary_falls_back_to_vision_provider(monkeypatch):
+    """When no summary provider is configured, summarisation reuses the vision
+    provider (the common single-Ollama setup)."""
+    from app.config import Settings
+
+    settings = Settings(
+        vision_ollama_base_url="http://ollama:11434",
+        vision_model="vl-model",
+        summary_model="sum-model",
+    )
+    captured = {}
+
+    async def fake_ollama(self, payload, base_url):
+        captured.setdefault("ollama", []).append((base_url, payload.get("model")))
+        return '{"name": "ok"}'
+
+    async def fake_openai(self, payload, base_url, api_key):
+        captured.setdefault("openai", []).append((base_url, payload.get("model")))
+        return '{"name": "ok"}'
+
+    monkeypatch.setattr(enrich_module.AIClient, "_ollama_chat", fake_ollama, raising=False)
+    monkeypatch.setattr(enrich_module.AIClient, "_openai_chat", fake_openai, raising=False)
+
+    client = enrich_module.AIClient(settings)
+    import asyncio
+
+    asyncio.get_event_loop().run_until_complete(client.vision_label(b"img"))
+    asyncio.get_event_loop().run_until_complete(enrich_module.summarize_search(client, "ctx"))
+
+    # Both stages used the vision Ollama endpoint; summary used summary_model.
+    assert captured["ollama"][0] == ("http://ollama:11434", "vl-model")
+    assert captured["ollama"][1] == ("http://ollama:11434", "sum-model")
+
+

@@ -55,17 +55,28 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 8 * 1024 * 1024
     max_backup_bytes: int = 512 * 1024 * 1024
 
-    # --- Enrichment: OpenAI-compatible / Ollama vision ---
-    openai_base_url: str | None = None
-    openai_api_key: str | None = None
-    openai_model: str | None = None
-
-    ollama_base_url: str | None = "http://192.168.1.222:11434"
+    # --- Enrichment: vision + summary models (separate providers allowed) ---
+    # Each stage can use its own OpenAI-compatible endpoint (or Ollama). This
+    # lets you, for example, run a local VL model for label reading while a
+    # hosted API does the fast text summarisation. When only *_BASE_URL is set
+    # it is treated as OpenAI-compatible; Ollama is used when *_BASE_URL is
+    # empty and the corresponding OLLAMA URL is provided.
+    vision_base_url: str | None = None
+    vision_api_key: str | None = None
     vision_model: str = "qwen2.5vl:latest"  # reads label photos (fast VL model)
-    text_model: str | None = None  # optional model for "best-effort from knowledge"
+    vision_ollama_base_url: str | None = "http://192.168.1.222:11434"
+
+    # Optional text-only model for the "best-effort from knowledge" step.
+    # Defaults to vision_model when empty.
+    text_model: str | None = None
+
+    summary_base_url: str | None = None
+    summary_api_key: str | None = None
     # Summarises raw internet search results into structured fields. The
     # vision model is heavy, so a small fast model does this job.
     summary_model: str = "nemotron-3-nano:4b"
+    summary_ollama_base_url: str | None = None
+
     ai_timeout_seconds: float = 120.0
 
     # --- Web search enrichment ---

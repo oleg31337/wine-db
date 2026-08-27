@@ -324,14 +324,24 @@ def _gauge_word_level(value) -> int | None:
 
 
 class AIClient:
-    """Talks to Ollama natively, or to any OpenAI-compatible endpoint."""
+    """Talks to a vision provider and a summary provider, each of which can be
+    either Ollama or any OpenAI-compatible endpoint configured separately."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
     @property
+    def vision_available(self) -> bool:
+        return bool(self.settings.vision_base_url or self.settings.vision_ollama_base_url)
+
+    @property
+    def summary_available(self) -> bool:
+        return bool(self.settings.summary_base_url or self.settings.summary_ollama_base_url)
+
+    @property
     def available(self) -> bool:
-        return bool(self.settings.ollama_base_url or self.settings.openai_base_url)
+        # Vision is the primary stage; keep the old name meaning "can read labels".
+        return self.vision_available
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
@@ -341,9 +351,10 @@ class AIClient:
 
     async def vision_label(self, image_bytes: bytes) -> dict:
         b64 = base64.b64encode(image_bytes).decode()
-        if self.settings.openai_base_url:
+        s = self.settings
+        if s.vision_base_url:
             payload = {
-                "model": self.settings.openai_model or self.settings.vision_model,
+                "model": s.vision_model,
                 "messages": [
                     {
                         "role": "user",
@@ -359,55 +370,56 @@ class AIClient:
                 "temperature": 0,
                 "stream": False,
             }
-            return _extract_json(await self._openai_chat(payload))
-        if not self.settings.ollama_base_url:
-            raise EnrichmentError("No AI endpoint configured")
+            return _extract_json(await self._openai_chat(payload, s.vision_base_url, s.vision_api_key))
+        if not s.vision_ollama_base_url:
+            raise EnrichmentError("No vision endpoint configured")
         payload = {
-            "model": self.settings.vision_model,
+            "model": s.vision_model,
             "messages": [{"role": "user", "content": _VISION_PROMPT, "images": [b64]}],
             "stream": False,
             "options": {"temperature": 0},
         }
-        return _extract_json(await self._ollama_chat(payload))
+        return _extract_json(await self._ollama_chat(payload, s.vision_ollama_base_url))
 
     async def text_lookup(self, context: str) -> dict:
-        model = (
-            self.settings.openai_model
-            if self.settings.openai_base_url
-            else (self.settings.text_model or self.settings.vision_model)
-        )
+        s = self.settings
+        model = s.text_model or s.vision_model
         prompt = f"{_TEXT_PROMPT}\n\nInformation about the wine:\n{context}"
-        if self.settings.openai_base_url:
+        # The text step reuses the vision provider's endpoint (it's an
+        # OpenAI-compatible chat completion either way).
+        endpoint = s.vision_base_url or s.vision_ollama_base_url
+        api_key = s.vision_api_key if s.vision_base_url else None
+        if s.vision_base_url:
             payload = {
                 "model": model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
                 "stream": False,
             }
-            return _extract_json(await self._openai_chat(payload))
-        if not self.settings.ollama_base_url:
-            raise EnrichmentError("No AI endpoint configured")
+            return _extract_json(await self._openai_chat(payload, s.vision_base_url, s.vision_api_key))
+        if not s.vision_ollama_base_url:
+            raise EnrichmentError("No vision endpoint configured")
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
             "options": {"temperature": 0.1},
         }
-        return _extract_json(await self._ollama_chat(payload))
+        return _extract_json(await self._ollama_chat(payload, s.vision_ollama_base_url))
 
-    async def _ollama_chat(self, payload: dict) -> str:
-        url = f"{self.settings.ollama_base_url.rstrip('/')}/api/chat"
+    async def _ollama_chat(self, payload: dict, base_url: str) -> str:
+        url = f"{base_url.rstrip('/')}/api/chat"
         async with self._client() as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             data = resp.json()
         return (data.get("message") or {}).get("content", "") or data.get("response", "")
 
-    async def _openai_chat(self, payload: dict) -> str:
-        url = f"{self.settings.openai_base_url.rstrip('/')}/chat/completions"
+    async def _openai_chat(self, payload: dict, base_url: str, api_key: str | None) -> str:
+        url = f"{base_url.rstrip('/')}/chat/completions"
         headers = {}
-        if self.settings.openai_api_key:
-            headers["Authorization"] = f"Bearer {self.settings.openai_api_key}"
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         async with self._client() as client:
             resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
@@ -642,22 +654,44 @@ _SUMMARY_PROMPT = (
 
 
 async def summarize_search(client: "AIClient", context: str) -> dict:
-    """Run raw search context through the local summariser model."""
+    """Run raw search context through the summary provider's model.
+
+    Falls back to the vision provider when no summary-specific provider is
+    configured (the common case: one Ollama serves both stages).
+    """
+    s = client.settings
     prompt = f"{_SUMMARY_PROMPT}\n\nSearch results:\n{context}"
-    if client.settings.openai_base_url:
+    if s.summary_base_url:
         payload = {
-            "model": client.settings.openai_model or client.settings.summary_model,
+            "model": s.summary_model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.1,
             "stream": False,
         }
-        return _extract_json(await client._openai_chat(payload))
-    if not client.settings.ollama_base_url:
-        raise EnrichmentError("No AI endpoint configured")
-    payload = {
-        "model": client.settings.summary_model,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": False,
-        "options": {"temperature": 0.1},
-    }
-    return _extract_json(await client._ollama_chat(payload))
+        return _extract_json(await client._openai_chat(payload, s.summary_base_url, s.summary_api_key))
+    if s.summary_ollama_base_url:
+        payload = {
+            "model": s.summary_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "options": {"temperature": 0.1},
+        }
+        return _extract_json(await client._ollama_chat(payload, s.summary_ollama_base_url))
+    # No dedicated summary provider: reuse the vision provider's endpoint.
+    if s.vision_base_url:
+        payload = {
+            "model": s.summary_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "stream": False,
+        }
+        return _extract_json(await client._openai_chat(payload, s.vision_base_url, s.vision_api_key))
+    if s.vision_ollama_base_url:
+        payload = {
+            "model": s.summary_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "options": {"temperature": 0.1},
+        }
+        return _extract_json(await client._ollama_chat(payload, s.vision_ollama_base_url))
+    raise EnrichmentError("No AI endpoint configured")

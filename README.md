@@ -53,8 +53,11 @@ interface never sees or sets any of it. Highlights:
 | --- | --- |
 | `SECRET_KEY` | Signs session cookies (≥32 chars). |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` | Seeds the only admin account. Production refuses to boot without them. |
-| `OLLAMA_BASE_URL` / `VISION_MODEL` | Local vision model that reads labels. |
-| `OPENAI_BASE_URL` / `OPENAI_MODEL` | Optional OpenAI-compatible endpoint (wins over Ollama when set). |
+| `VISION_MODEL` / `VISION_OLLAMA_BASE_URL` | Local vision model that reads labels (Ollama). |
+| `VISION_BASE_URL` / `VISION_API_KEY` | Optional OpenAI-compatible vision endpoint (wins over Ollama when set). |
+| `SUMMARY_MODEL` / `SUMMARY_OLLAMA_BASE_URL` | Local summariser model for web-search results (Ollama). |
+| `SUMMARY_BASE_URL` / `SUMMARY_API_KEY` | Optional OpenAI-compatible summary endpoint — can differ from the vision provider. |
+| `TEXT_MODEL` | Optional text-only model for "from knowledge" hints (defaults to `VISION_MODEL`). |
 ### Web search & enrichment
 Internet lookups run a general web search and, if that returns nothing (DuckDuckGo's
 unauthenticated HTML endpoint is increasingly gated by an anti-bot challenge),

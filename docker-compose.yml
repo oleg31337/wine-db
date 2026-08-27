@@ -71,14 +71,17 @@ services:
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-8388608}
       MAX_BACKUP_BYTES: ${MAX_BACKUP_BYTES:-536870912}
 
-      # --- Label reading (Ollama on the LAN, or any OpenAI-compatible endpoint)
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      # --- Label reading: vision model (Ollama on the LAN, or any OpenAI-compatible)
+      VISION_OLLAMA_BASE_URL: ${VISION_OLLAMA_BASE_URL:-}
+      VISION_BASE_URL: ${VISION_BASE_URL:-}
+      VISION_API_KEY: ${VISION_API_KEY:-}
       VISION_MODEL: ${VISION_MODEL:-qwen2.5vl:latest}
       TEXT_MODEL: ${TEXT_MODEL:-}
+      # --- Summarisation: can be a DIFFERENT provider from the vision model
       SUMMARY_MODEL: ${SUMMARY_MODEL:-nemotron-3-nano:4b}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      SUMMARY_BASE_URL: ${SUMMARY_BASE_URL:-}
+      SUMMARY_API_KEY: ${SUMMARY_API_KEY:-}
+      SUMMARY_OLLAMA_BASE_URL: ${SUMMARY_OLLAMA_BASE_URL:-}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
 
       # --- Internet lookup
