@@ -638,8 +638,11 @@ def test_vision_and_summary_use_separate_providers(monkeypatch):
     client = enrich_module.AIClient(settings)
     import asyncio
 
-    asyncio.get_event_loop().run_until_complete(client.vision_label(b"img"))
-    asyncio.get_event_loop().run_until_complete(enrich_module.summarize_search(client, "ctx"))
+    async def run_all():
+        await client.vision_label(b"img")
+        await enrich_module.summarize_search(client, "ctx")
+
+    asyncio.run(run_all())
 
     assert captured["openai"][0] == ("https://vision.example/v1", "vision-key", "vl-model")
     assert captured["openai"][1] == ("https://summary.example/v1", "summary-key", "sum-model")
@@ -671,8 +674,11 @@ def test_summary_falls_back_to_vision_provider(monkeypatch):
     client = enrich_module.AIClient(settings)
     import asyncio
 
-    asyncio.get_event_loop().run_until_complete(client.vision_label(b"img"))
-    asyncio.get_event_loop().run_until_complete(enrich_module.summarize_search(client, "ctx"))
+    async def run_all():
+        await client.vision_label(b"img")
+        await enrich_module.summarize_search(client, "ctx")
+
+    asyncio.run(run_all())
 
     # Both stages used the vision Ollama endpoint; summary used summary_model.
     assert captured["ollama"][0] == ("http://ollama:11434", "vl-model")
