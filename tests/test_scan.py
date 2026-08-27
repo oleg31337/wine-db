@@ -629,12 +629,7 @@ def test_vision_and_summary_use_separate_providers(monkeypatch):
         captured.setdefault("openai", []).append((base_url, api_key, payload.get("model")))
         return '{"name": "ok"}'
 
-    async def fake_ollama(self, payload, base_url):
-        captured.setdefault("ollama", []).append((base_url, payload.get("model")))
-        return '{"name": "ok"}'
-
     monkeypatch.setattr(enrich_module.AIClient, "_openai_chat", fake_openai, raising=False)
-    monkeypatch.setattr(enrich_module.AIClient, "_ollama_chat", fake_ollama, raising=False)
 
     client = enrich_module.AIClient(settings)
     import asyncio
@@ -645,31 +640,38 @@ def test_vision_and_summary_use_separate_providers(monkeypatch):
 
     asyncio.run(run_all())
 
-    assert captured["openai"][0] == ("https://vision.example/v1", "vision-key", "vl-model")
-    assert captured["openai"][1] == ("https://summary.example/v1", "summary-key", "sum-model")
+    assert captured["openai"][0] == (
+        "https://vision.example/v1",
+        "vision-key",
+        "vl-model",
+    )
+    assert captured["openai"][1] == (
+        "https://summary.example/v1",
+        "summary-key",
+        "sum-model",
+    )
 
 
 def test_summary_falls_back_to_vision_provider(monkeypatch):
     """When no summary provider is configured, summarisation reuses the vision
-    provider (the common single-Ollama setup)."""
+    provider (the common single-endpoint setup)."""
     from app.config import Settings
 
     settings = Settings(
-        vision_ollama_base_url="http://ollama:11434",
+        vision_base_url="http://ollama:11434",
         vision_model="vl-model",
         summary_model="sum-model",
+        # Explicitly disable any summary provider (incl. from .env) so the
+        # fallback-to-vision path is exercised.
+        summary_base_url=None,
+        summary_api_key=None,
     )
     captured = {}
-
-    async def fake_ollama(self, payload, base_url):
-        captured.setdefault("ollama", []).append((base_url, payload.get("model")))
-        return '{"name": "ok"}'
 
     async def fake_openai(self, payload, base_url, api_key):
         captured.setdefault("openai", []).append((base_url, payload.get("model")))
         return '{"name": "ok"}'
 
-    monkeypatch.setattr(enrich_module.AIClient, "_ollama_chat", fake_ollama, raising=False)
     monkeypatch.setattr(enrich_module.AIClient, "_openai_chat", fake_openai, raising=False)
 
     client = enrich_module.AIClient(settings)
@@ -681,8 +683,25 @@ def test_summary_falls_back_to_vision_provider(monkeypatch):
 
     asyncio.run(run_all())
 
-    # Both stages used the vision Ollama endpoint; summary used summary_model.
-    assert captured["ollama"][0] == ("http://ollama:11434", "vl-model")
-    assert captured["ollama"][1] == ("http://ollama:11434", "sum-model")
+    # Both stages used the vision endpoint; summary used summary_model. The mock
+    # receives the RAW base_url; normalization happens inside _openai_chat.
+    assert captured["openai"][0] == ("http://ollama:11434", "vl-model")
+    assert captured["openai"][1] == ("http://ollama:11434", "sum-model")
+
+
+def test_openai_url_normalisation():
+    """A bare host, a /v1 root, or a full URL all map to /v1/chat/completions."""
+    assert enrich_module.AIClient._openai_url("https://api.deepseek.com") == (
+        "https://api.deepseek.com/v1/chat/completions"
+    )
+    assert enrich_module.AIClient._openai_url("https://api.openai.com/v1") == (
+        "https://api.openai.com/v1/chat/completions"
+    )
+    assert enrich_module.AIClient._openai_url("https://api.openai.com/v1/chat/completions") == (
+        "https://api.openai.com/v1/chat/completions"
+    )
+    assert enrich_module.AIClient._openai_url("http://192.168.1.222:11434") == (
+        "http://192.168.1.222:11434/v1/chat/completions"
+    )
 
 

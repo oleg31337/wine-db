@@ -56,15 +56,14 @@ class Settings(BaseSettings):
     max_backup_bytes: int = 512 * 1024 * 1024
 
     # --- Enrichment: vision + summary models (separate providers allowed) ---
-    # Each stage can use its own OpenAI-compatible endpoint (or Ollama). This
-    # lets you, for example, run a local VL model for label reading while a
-    # hosted API does the fast text summarisation. When only *_BASE_URL is set
-    # it is treated as OpenAI-compatible; Ollama is used when *_BASE_URL is
-    # empty and the corresponding OLLAMA URL is provided.
+    # Each stage is an OpenAI-compatible chat-completions endpoint. This covers
+    # both hosted APIs and local Ollama (Ollama exposes an OpenAI-compatible
+    # shim at /v1/chat/completions, so point VISION_BASE_URL at the Ollama host,
+    # e.g. http://192.168.1.222:11434). The URL is normalised to end in
+    # /v1/chat/completions automatically, so you don't need the /v1 suffix.
     vision_base_url: str | None = None
     vision_api_key: str | None = None
     vision_model: str = "qwen2.5vl:latest"  # reads label photos (fast VL model)
-    vision_ollama_base_url: str | None = "http://192.168.1.222:11434"
 
     # Optional text-only model for the "best-effort from knowledge" step.
     # Defaults to vision_model when empty.
@@ -75,7 +74,6 @@ class Settings(BaseSettings):
     # Summarises raw internet search results into structured fields. The
     # vision model is heavy, so a small fast model does this job.
     summary_model: str = "nemotron-3-nano:4b"
-    summary_ollama_base_url: str | None = None
 
     ai_timeout_seconds: float = 120.0
 

@@ -53,10 +53,10 @@ interface never sees or sets any of it. Highlights:
 | --- | --- |
 | `SECRET_KEY` | Signs session cookies (≥32 chars). |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` | Seeds the only admin account. Production refuses to boot without them. |
-| `VISION_MODEL` / `VISION_OLLAMA_BASE_URL` | Local vision model that reads labels (Ollama). |
-| `VISION_BASE_URL` / `VISION_API_KEY` | Optional OpenAI-compatible vision endpoint (wins over Ollama when set). |
-| `SUMMARY_MODEL` / `SUMMARY_OLLAMA_BASE_URL` | Local summariser model for web-search results (Ollama). |
-| `SUMMARY_BASE_URL` / `SUMMARY_API_KEY` | Optional OpenAI-compatible summary endpoint — can differ from the vision provider. |
+| `VISION_MODEL` / `VISION_BASE_URL` | Vision model that reads labels (OpenAI-compatible; also covers Ollama's `/v1` shim — point at the host, e.g. `http://192.168.1.222:11434`). |
+| `VISION_API_KEY` | Optional API key for the vision endpoint (not needed for local Ollama). |
+| `SUMMARY_MODEL` / `SUMMARY_BASE_URL` | Summariser for web-search results (OpenAI-compatible). Can differ from the vision provider; reuses `VISION_BASE_URL` when empty. |
+| `SUMMARY_API_KEY` | Optional API key for the summary endpoint. |
 | `TEXT_MODEL` | Optional text-only model for "from knowledge" hints (defaults to `VISION_MODEL`). |
 ### Web search & enrichment
 Internet lookups run a general web search and, if that returns nothing (DuckDuckGo's
