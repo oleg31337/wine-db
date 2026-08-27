@@ -420,6 +420,7 @@ def test_summariser_declining_web_falls_back_without_overwriting(api, user, fake
         return "Barolo wine pasta sauce ingredients: tomato, pork...", ["src"]
 
     monkeypatch.setattr(enrich_module, "summarize_search", fake_summarize)
+    monkeypatch.setattr(scan_router, "summarize_search", fake_summarize)
     monkeypatch.setattr(scan_router, "search_web", fake_search)
     body = api.post("/api/scan/lookup", json={"name": "Barolo"}).json()
     # No reliable web match -> no confident web-sourced country/grape.
