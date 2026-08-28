@@ -14,6 +14,7 @@ from app.db import get_db
 from app.models import User, utcnow
 from app.schemas import (
     AdminPasswordResetRequest,
+    DisplayNameUpdate,
     LoginRequest,
     PasswordChangeRequest,
     UserCreateRequest,
@@ -140,6 +141,23 @@ def logout(
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(current_user)) -> UserOut:
+    return UserOut.model_validate(user)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: DisplayNameUpdate,
+    user: User = Depends(current_user),
+    _: None = Depends(require_csrf),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """Any signed-in user may change their own display name.
+
+    An empty/whitespace-only value clears the name (falls back to the username
+    everywhere it is shown). The username itself is immutable.
+    """
+    user.display_name = payload.display_name or None
+    db.flush()
     return UserOut.model_validate(user)
 
 

@@ -58,6 +58,13 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=12, max_length=128)
 
 
+class DisplayNameUpdate(BaseModel):
+    """Self-service display-name change (any signed-in user)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    display_name: str | None = Field(default=None, max_length=64)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

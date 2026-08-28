@@ -57,6 +57,8 @@
     $("#account-name").textContent = user.username;
     $("#account-info").textContent =
       "Signed in as " + user.username + (user.display_name ? " (" + user.display_name + ")" : "") + ".";
+    var dn = $("#display-name");
+    if (dn) dn.value = user.display_name || "";
     // The Data tab (backup + user management) is admin-only.
     W.$$('.tabbar button[data-admin="1"]').forEach(function (b) {
       b.classList.toggle("hidden", !W.isAdmin);
@@ -604,6 +606,10 @@
         .catch(W.errToast);
     });
 
+    $("#btn-save-name").addEventListener("click", function () {
+      updateDisplayName($("#display-name").value.trim());
+    });
+
     $("#btn-logout").addEventListener("click", function () {
       W.api
         .post("/api/auth/logout")
@@ -629,6 +635,14 @@
         footer: [
           el("button", {
             type: "button",
+            text: "Change display name",
+            onclick: function () {
+              m.close();
+              openDisplayNameModal();
+            },
+          }),
+          el("button", {
+            type: "button",
             text: "Change password",
             onclick: function () {
               m.close();
@@ -648,6 +662,22 @@
         ],
       });
     });
+  }
+
+  /* Self-service display-name change (available to every signed-in user). */
+  function updateDisplayName(value) {
+    var dn = value || "";
+    W.api
+      .patch("/api/auth/me", { json: { display_name: dn } })
+      .then(function (me) {
+        W.me = me;
+        $("#account-info").textContent =
+          "Signed in as " + me.username + (me.display_name ? " (" + me.display_name + ")" : "") + ".";
+        var field = $("#display-name");
+        if (field) field.value = me.display_name || "";
+        W.toast("Display name saved", "ok");
+      })
+      .catch(W.errToast);
   }
 
   /* Self-service password change (available to every signed-in user). */
@@ -695,6 +725,35 @@
         }),
       ],
     });
+  }
+
+  /* Self-service display-name edit modal (used by the non-admin account sheet). */
+  function openDisplayNameModal() {
+    var input = el("input", {
+      id: "dn-input", type: "text", maxlength: 64,
+      value: (W.me && W.me.display_name) || "",
+      placeholder: "e.g. Oleg's cellar",
+    });
+    var m = W.modal({
+      title: "Change display name",
+      body: el("div", {}, [
+        el("div", { class: "field" }, [
+          el("label", { for: "dn-input", text: "Display name (optional — leave blank to use your username)" }),
+          input,
+        ]),
+      ]),
+      footer: [
+        el("button", { type: "button", text: "Cancel", onclick: function () { m.close(); } }),
+        el("button", {
+          type: "button", class: "btn-primary", text: "Save",
+          onclick: function () {
+            m.close();
+            updateDisplayName(input.value.trim());
+          },
+        }),
+      ],
+    });
+    if (input.focus) input.focus();
   }
 
   /* Admin reset of another user's password (no current-password check). */

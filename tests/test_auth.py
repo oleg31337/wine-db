@@ -172,6 +172,37 @@ def test_password_change_requires_correct_current_password(api, user):
     assert resp.status_code == 403
 
 
+def test_user_can_change_own_display_name(api, user):
+    """Any signed-in user may set a display name; it shows up on /me."""
+    resp = api.patch("/api/auth/me", json={"display_name": "Oleg's Cellar"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["display_name"] == "Oleg's Cellar"
+
+    me = api.get("/api/auth/me").json()
+    assert me["display_name"] == "Oleg's Cellar"
+
+
+def test_clearing_display_name_falls_back_to_username(api, user):
+    api.patch("/api/auth/me", json={"display_name": "Temp Name"})
+    # Empty / whitespace-only value clears the display name.
+    resp = api.patch("/api/auth/me", json={"display_name": "   "})
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] is None
+
+
+def test_display_name_change_requires_auth(client):
+    assert client.patch("/api/auth/me", json={"display_name": "x"}).status_code == 401
+
+
+def test_display_name_is_optional_and_immutable_username(api, user):
+    """The username is not part of the payload, so it must not change."""
+    before = api.get("/api/auth/me").json()["username"]
+    api.patch("/api/auth/me", json={"display_name": "Renamed"})
+    after = api.get("/api/auth/me").json()
+    assert after["username"] == before
+    assert after["display_name"] == "Renamed"
+
+
 # ----------------------------------------------------------- admin authorization
 
 

@@ -257,6 +257,13 @@
         <h2>Account</h2>
         <p class="muted" id="account-info"></p>
         <div class="field">
+          <label for="display-name">Display name <span class="muted">(optional)</span></label>
+          <input id="display-name" type="text" maxlength="64" autocomplete="name" />
+        </div>
+        <div class="pill-row">
+          <button type="button" id="btn-save-name">Save display name</button>
+        </div>
+        <div class="field">
           <label for="pw-current">Current password</label>
           <input id="pw-current" type="password" autocomplete="current-password" maxlength="128" />
         </div>
