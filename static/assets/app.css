@@ -375,6 +375,11 @@ main {
 }
 .scan-actions { display: grid; gap: 0.5rem; grid-template-columns: 1fr 1fr; margin-top: 0.75rem; }
 .scan-actions .full { grid-column: 1 / -1; }
+.manual-thumb {
+  display: block; width: 100%; max-width: 200px; aspect-ratio: 3 / 4;
+  object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line);
+  margin-bottom: 0.5rem;
+}
 
 .suggest-box { border: 1px solid var(--gold); background: #fbf6ec; border-radius: var(--radius); padding: 0.8rem; }
 .suggest-list { display: grid; gap: 0.4rem; margin: 0.5rem 0; }

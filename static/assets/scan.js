@@ -143,6 +143,28 @@
     $("#scan-idle").classList.add("hidden");
   }
 
+  /* Attach a photo in manual-add mode WITHOUT any AI enrichment. Just resize
+     it in-browser, keep it as the capturedBlob (uploaded on save), and show a
+     thumbnail. The user fills the card's text fields themselves. */
+  function attachManualPhoto(file, thumb, pill) {
+    W.toast("Attaching photo…", "ok", 1500);
+    resizeImageBlob(file, 1600, 0.82)
+      .then(function (resized) {
+        if (!resized) resized = file;
+        capturedBlob = resized;
+        if (thumb) {
+          if (thumb.src && thumb.src.indexOf("blob:") === 0) URL.revokeObjectURL(thumb.src);
+          thumb.src = URL.createObjectURL(resized);
+          thumb.classList.remove("hidden");
+        }
+        if (pill) pill.textContent = "🖼 Change photo";
+        W.toast("Photo attached", "ok");
+      })
+      .catch(function () {
+        W.toast("Could not read that photo", "err");
+      });
+  }
+
   /* Send the photo to the server for vision + internet enrichment. */
   function analyze(blob, manual) {
     // The back label is scanned for its TEXT only; the wine picture in the
@@ -230,39 +252,40 @@
         el("p", { class: "hint", text: "Applied to empty fields only — review and correct anything wrong." })
       );
     }
-    // When adding manually, the only image action is "Select photo" (a file
-    // picker that reuses the AI label-reading path). The camera/back-label scan
-    // flow keeps the "Scan the back label" offer.
+    // When adding manually, "Select photo" only ATTACHES the image - it must
+    // not trigger AI label reading / web enrichment. The whole point of manual
+    // add is that the user fills the card themselves.
     if (manual) {
+      var thumb = el("img", {
+        id: "manual-thumb",
+        alt: "Selected wine label photo",
+        class: "manual-thumb hidden",
+      });
+      var photoPill = el("label", {
+        class: "btn-sm btn-primary",
+        for: "manual-photo",
+        style: "cursor:pointer",
+        text: "🖼 Select photo",
+      });
+      var photoInput = el("input", {
+        id: "manual-photo",
+        type: "file",
+        accept: "image/*",
+        class: "sr-only",
+      });
       box.appendChild(
-        el("div", { class: "pill-row", style: "margin-top:0.5rem" }, [
-          el("label", {
-            class: "btn-sm btn-primary",
-            for: "manual-photo",
-            style: "cursor:pointer",
-            text: "🖼 Select photo",
-          }),
-          el("input", {
-            id: "manual-photo",
-            type: "file",
-            accept: "image/*",
-            class: "sr-only",
-          }),
-        ])
+        el("div", { class: "field", style: "margin-top:0.5rem" }, [thumb, photoPill, photoInput])
       );
-      var picker = box.querySelector("#manual-photo");
-      if (picker) {
-        picker.addEventListener("change", function (ev) {
-          var file = ev.target.files && ev.target.files[0];
-          if (!file) return;
-          if (file.size > 12 * 1024 * 1024) {
-            W.toast("That image is too large (max ~8 MB after processing).", "err");
-            return;
-          }
-          analyze(file);
-          ev.target.value = "";
-        });
-      }
+      photoInput.addEventListener("change", function (ev) {
+        var file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        if (file.size > 12 * 1024 * 1024) {
+          W.toast("That image is too large (max ~8 MB after processing).", "err");
+          return;
+        }
+        attachManualPhoto(file, thumb, photoPill);
+        ev.target.value = "";
+      });
     } else if (!isBackLabel) {
       // Always offer to also scan the back label: it usually carries the region,
       // grape, alcohol and sugar that the front rarely lists. Skipped when we are
