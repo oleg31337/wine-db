@@ -37,6 +37,10 @@
       b.setAttribute("aria-selected", b.dataset.view === name ? "true" : "false");
     });
     if (name !== "scan" && W.stopCamera) W.stopCamera();
+    // Entering the Add Wine / scan view: start the camera automatically when
+    // the browser supports it. If it can't, startCamera shows a message in
+    // the camera window ("use Choose a photo").
+    if (name === "scan" && W.startCamera) W.startCamera();
     if (name === "favorites") loadFavoriteLists();
     if (name === "data") loadUsers();
     window.scrollTo({ top: 0, behavior: "instant" });

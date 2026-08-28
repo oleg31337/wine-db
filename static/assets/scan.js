@@ -75,11 +75,19 @@
   }
 
   function startCamera() {
+    var idle = $("#scan-idle");
+    function showIdle(msg) {
+      if (idle) {
+        idle.textContent = msg;
+        idle.classList.remove("hidden");
+      }
+    }
     if (!cameraSupported()) {
       var msg = secureContext()
-        ? "This browser cannot open the camera."
-        : "Live camera needs a secure (HTTPS) connection. Open the app through your HTTPS address, or use “Choose a photo” to take a picture.";
-      W.toast(msg + " “Choose a photo” works on this device.", "err");
+        ? "Camera not available in this browser — use “Choose a photo” instead."
+        : "Live camera needs a secure (HTTPS) connection. Open the app through your HTTPS address, or use “Choose a photo”.";
+      showIdle(msg);
+      W.toast(msg, "err");
       return;
     }
     stopCamera();
@@ -104,12 +112,12 @@
         hint("Capture the label — or choose a photo below.");
       })
       .catch(function (err) {
-        W.toast(
+        var msg =
           err && err.name === "NotAllowedError"
-            ? "Camera permission was denied."
-            : "Could not open the camera — use “Choose a photo instead”.",
-          "err"
-        );
+            ? "Camera permission was denied — use “Choose a photo” instead."
+            : "Camera could not start — use “Choose a photo” instead.";
+        showIdle(msg);
+        W.toast(msg, "err");
       });
   }
 
@@ -309,13 +317,13 @@
   }
 
   /* Re-point the camera at the back label and merge its reading into the
-     same card the user is building, so front-label data is preserved. */
+     same card the user is building, so front-label data is preserved.
+     Switching to the scan view auto-starts the camera (see W.switchView). */
   function startBackLabelScan(form) {
     currentForm = form;
     isBackLabel = true;
     W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
     W.switchView("scan");
-    startCamera();
     W.toast("Point the camera at the BACK label", "ok");
   }
 
@@ -461,6 +469,7 @@
     });
 
     W.stopCamera = stopCamera;
+    W.startCamera = startCamera;
     W.manualAdd = function () {
       reset();
       manualMode = true;

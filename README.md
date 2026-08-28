@@ -83,14 +83,19 @@ python -m app.tools.admin_hash "your-admin-password"
 
 ## Scanning a bottle
 
-1. Tap **Scan** and point the camera at the **front label** (or choose a photo).
+1. Tap **Scan** — the camera starts **automatically** when your browser supports
+   it (secure context). If it can't open, the camera window explains why and
+   points you to **"Choose a photo"** instead. Point the camera at the **front
+   label** (or choose a photo).
 2. The app resizes the photo in your browser, sends it to the vision model, and
    pre-fills the card with what it read.
 3. After the front label is read, a *"Scan the back label"* button is offered.
    The back label usually carries the region, grape, alcohol and sugar that the
    front omits. Scanning it **merges** its data into the *same* card (front
-   data is never lost) — it does not start over.
-4. Review the merged card, fill anything missing, and **Save wine**.
+   data is never lost) — it does not start over. The camera restarts
+   automatically for the back label.
+4. Review the merged card, fill anything missing, and **Save wine** — the card
+   closes and you land back on **Browse** with the refreshed list.
 
 Prefer to add a wine without the camera? On the **Add Wine** page, choose
 **"+ Add manually"** — the new card offers **"Select photo"** so you can pick a
