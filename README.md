@@ -113,11 +113,13 @@ saved as the wine's picture. The back label is read for its text (region,
 grape, alcohol, sugar) and merged into the card, but its image is never stored
 as the wine photo.
 
-### Web search includes SAQ
-A **`site:saq.com`** scoped query is also sent to the search engine so SAQ's
-product pages are considered when the engine is reachable. SAQ has no public API,
-so if the primary engine (DuckDuckGo/SearXNG) is unavailable, that query simply
-contributes nothing and the general Wikipedia fallback still enriches the wine.
+### Web search includes SAQ and Vivino
+Alongside the general web search, **`site:saq.com`** and **`site:vivino.com`**
+scoped queries are also sent (run **in parallel** so they don't add latency).
+SAQ and Vivino are large wine catalogues, so their product pages are
+considered when the engine supports site-scoping. Neither has a public API, so
+if the primary engine (DuckDuckGo/SearXNG) is unavailable, those queries simply
+contribute nothing and the general Wikipedia fallback still enriches the wine.
 
 ### How images are handled
 

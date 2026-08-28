@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+import asyncio
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
@@ -77,16 +78,22 @@ async def _enrich_from_context(
     ]
     query = " ".join(b for b in query_bits if b).strip()
     web_context, web_sources = await search_web(settings, query) if query else ("", [])
-    # SAQ (saq.com) is a large wine catalogue; try a site-scoped search
-    # alongside the general one so its product pages are also considered when
-    # the engine supports it. No Wikipedia fallback here (a bare "site:saq.com"
-    # would pollute the fallback), and SAQ has no public API, so this simply
-    # contributes nothing when the primary engine is unavailable.
+
+    # Large wine catalogues are queried with site-scoped searches, run in
+    # parallel to save time. SAQ (saq.com) and Vivino (vivino.com) are large
+    # wine databases; their product pages are also considered when the engine
+    # supports site-scoping. No Wikipedia fallback applies to these (a bare
+    # "site:..." would pollute the fallback), and neither has a public API, so
+    # each simply contributes nothing when the primary engine is unavailable.
     if query:
-        saq_context, saq_sources = await search_web(settings, query + " site:saq.com")
-        if saq_context:
-            web_context = (web_context + "\n" + saq_context).strip()
-            web_sources = web_sources + saq_sources
+        saq_task = search_web(settings, query + " site:saq.com")
+        vivino_task = search_web(settings, query + " site:vivino.com")
+        saq_context, saq_sources = await saq_task
+        vivino_context, vivino_sources = await vivino_task
+        for ctx, src in ((saq_context, saq_sources), (vivino_context, vivino_sources)):
+            if ctx:
+                web_context = (web_context + "\n" + ctx).strip()
+                web_sources = web_sources + src
     if web_context:
         sources.extend(web_sources)
         confidence = "medium"
