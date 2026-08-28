@@ -671,8 +671,11 @@
       .patch("/api/auth/me", { json: { display_name: dn } })
       .then(function (me) {
         W.me = me;
-        $("#account-info").textContent =
-          "Signed in as " + me.username + (me.display_name ? " (" + me.display_name + ")" : "") + ".";
+        var info = $("#account-info");
+        if (info) {
+          info.textContent =
+            "Signed in as " + me.username + (me.display_name ? " (" + me.display_name + ")" : "") + ".";
+        }
         var field = $("#display-name");
         if (field) field.value = me.display_name || "";
         W.toast("Display name saved", "ok");

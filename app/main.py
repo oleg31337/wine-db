@@ -35,7 +35,11 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
-    "style-src 'self'; "
+    # Inline style attributes are used throughout the UI (and created at runtime
+    # in JS), so 'unsafe-inline' for styles is required for the layout to render.
+    # This is low-risk: style-src cannot execute script, and script-src stays
+    # locked to 'self', so no injected style can run JavaScript.
+    "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' blob: data:; "
     "media-src 'self' blob:; "
     "connect-src 'self'; "

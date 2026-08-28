@@ -5,8 +5,8 @@ with your phone camera, let a local vision model read it, and the app fills in
 the card for you. Rate, comment, group into favorites, and search your cellar —
 all behind a reverse proxy on your own hardware.
 
-- **Private & local-first** — your data stays on your server; AI runs on your
-  Ollama (or any OpenAI-compatible endpoint).
+- **Private & local-first** — your data stays on your server; AI runs via any
+  OpenAI-compatible endpoint (e.g. Ollama locally, or a cloud provider such as DeepSeek).
 - **Label scanning** — front *and* back label OCR and web
   enrichment, merged into one card.
 - **Secure** — Argon2id passwords, HttpOnlyJWT cookies, CSRF protection,
@@ -36,7 +36,7 @@ authentication offload (none here; auth is app-level).
 
 > **Web cam note:** `getUserMedia` only works on a *secure origin* (HTTPS, or
 > `localhost`/`127.0.0.1`). Over a plain-HTTP LAN address the live camera is
-> disabled — use **"Choose a photo"** (the OS camera picker) instead, which
+> disabled — use **"Select photo"** (the OS camera picker) instead, which
 > still works.
 
 Open the app through your HTTPS URL, sign in as the admin, and create user
@@ -150,6 +150,10 @@ contribute nothing and the general Wikipedia fallback still enriches the wine.
 - **Non-admin users** can add wines, rate, comment, and manage favorites, and
   change their *own* password (gear ⚙ → *Change password*). They do **not** get
   the Data/backup/user-management screens.
+- **Display name** — every user can set an optional display name shown next to
+  their ratings and comments and in the user list. Admins edit it on the **Data**
+  tab (*Account* card → *Display name*); non-admins use gear ⚙ → *Change display
+  name*. Leaving it blank falls back to the username.
 - **Admins** can reset any user's password from the user list (invalidates that
   user's existing sessions) and export/import the whole database as a ZIP.
 - New accounts are **not** forced to change the initial password.
