@@ -44,6 +44,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Stamp the deploy with the git commit SHA so every rebuild forces the
+      # browser to fetch fresh JS (the SPA only loads scripts once per page load).
+      args:
+        APP_VERSION: ${APP_VERSION:-local}
     restart: unless-stopped
     depends_on:
       db:

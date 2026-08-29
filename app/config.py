@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     app_name: str = "wine-db"
     environment: str = Field(default="production")
     web_port: int = 8080
+    # Deploy version stamped onto static asset URLs (?v=) so every rebuild forces
+    # the browser to fetch fresh JS instead of running a stale cached copy. Falls
+    # back to a process-start timestamp when unset (still unique per deploy).
+    app_version: str | None = None
 
     # Secret used to sign session JWTs. MUST be set in production.
     secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48))

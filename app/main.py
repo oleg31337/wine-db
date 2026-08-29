@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -157,6 +158,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None,
     )
 
+    # Deploy version stamped onto every static asset URL so a fresh build always
+    # ships its JS/CSS. A long-lived SPA tab only loads scripts once; without
+    # this, a rebuild could leave the tab running a stale asset until a manual
+    # reload. APP_VERSION is set at build time (Dockerfile) to the git SHA; the
+    # process-start timestamp is a safe per-deploy fallback.
+    asset_version = settings.app_version or str(int(time.time()))
+
     rate_rules = [
         Rule(
             limit=settings.rate_limit_login_per_minute,
@@ -206,9 +214,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         async def index() -> FileResponse:
-            return FileResponse(
-                STATIC_DIR / "index.html", headers={"Cache-Control": "no-store"}
+            # Stamp a deploy version onto every static asset URL so browsers fetch
+            # the new build instead of serving a cached script after a deploy.
+            import re
+
+            html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+            html = re.sub(
+                r'src="/assets/([^"]+)"',
+                lambda m: 'src="/assets/' + m.group(1) + '?v=' + asset_version + '"',
+                html,
             )
+            import tempfile
+
+            fd, path = tempfile.mkstemp(suffix=".html")
+            with open(fd, "wb") as f:
+                f.write(html.encode("utf-8"))
+            return FileResponse(path, headers={"Cache-Control": "no-store"})
 
         @app.get("/manifest.webmanifest", include_in_schema=False)
         async def manifest() -> FileResponse:

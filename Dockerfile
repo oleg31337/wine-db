@@ -24,10 +24,12 @@ RUN python -m venv /opt/venv \
 
 FROM python:3.13-slim-bookworm AS runtime
 
+ARG APP_VERSION=local
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    APP_VERSION=${APP_VERSION}
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpq5 curl \

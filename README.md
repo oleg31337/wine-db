@@ -26,7 +26,10 @@ openssl rand -base64 48      # -> SECRET_KEY
 openssl rand -base64 24      # -> POSTGRES_PASSWORD
 # Create the admin password hash and paste it into .env:
 python -m app.tools.admin_hash "your-admin-password"   # -> ADMIN_PASSWORD_HASH
-docker compose up -d --build
+# Build & run (the build script stamps the deploy with the git SHA so browsers
+# fetch fresh JS after each update):
+./scripts/build.sh
+docker compose up -d
 ```
 
 The app serves on `0.0.0.0:8080` inside the container. Put it behind a reverse
