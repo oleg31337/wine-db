@@ -32,12 +32,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     APP_VERSION=${APP_VERSION}
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libpq5 curl \
+ && apt-get install -y --no-install-recommends libpq5 curl gosu \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --gid 10001 wine \
  && useradd --uid 10001 --gid wine --create-home --shell /usr/sbin/nologin wine
 
 COPY --from=builder /opt/venv /opt/venv
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /app
 COPY app/ ./app/
@@ -47,7 +49,7 @@ COPY static/ ./static/
 # when the volume starts empty.
 RUN mkdir -p /data/uploads
 
-USER wine
+USER root
 
 EXPOSE 8080
 
@@ -56,6 +58,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 # One worker keeps the in-process rate limiter and login throttle coherent.
 # wine-db is a household-scale app; scale the reverse proxy, not this.
+# Entrypoint fixes /data ownership (host bind mount starts root-owned) then
+# drops to the unprivileged 'wine' user via gosu for the server process.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", "--port", "8080", \
      "--workers", "1", \
