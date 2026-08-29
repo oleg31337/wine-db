@@ -237,6 +237,46 @@
       });
   }
 
+  /* Renders the "this wine might already exist" banner when the vision model read
+     a name that matches an existing wine in the collection (matched on name/maker,
+     never the vintage/year). Each match links to the real, full wine card. */
+  function duplicateBanner(result, manual) {
+    var matches = result.existing_matches || [];
+    if (!matches.length) return null;
+    var list = el("div", { class: "dup-list" });
+    matches.forEach(function (w) {
+      var sub = [w.maker || "Unknown maker"];
+      if (w.vintage) sub.push(String(w.vintage));
+      if (w.region) sub.push(w.region);
+      var left = el("div", { class: "dup-info" }, [
+        el("div", { class: "dup-name", text: w.name }),
+        el("div", { class: "muted", text: sub.join(" · ") }),
+      ]);
+      var open = el("button", {
+        type: "button",
+        class: "btn-sm btn-primary",
+        text: "Open existing card",
+        onclick: function () {
+          // Close this scan modal and open the real wine detail sheet.
+          W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
+          if (W.openWine) W.openWine(w.id, W.me, function () { if (refreshHook) refreshHook(); });
+          else W.toast("Could not open that wine", "err");
+        },
+      });
+      list.appendChild(el("div", { class: "dup-row" }, [left, open]));
+    });
+
+    var title =
+      matches.length === 1
+        ? "This wine may already be in your collection"
+        : matches.length + " wines like this may already be in your collection";
+    return el("div", { class: "dup-banner" }, [
+      el("p", { class: "dup-head", text: title }),
+      el("p", { class: "muted", text: "Matching is by name only — the vintage is ignored. Open one to add your tasting notes to the existing card instead of creating a duplicate." }),
+      list,
+    ]);
+  }
+
   function suggestionSummary(result, form, manual) {
     var box = el("div", { class: "suggest-box" });
     var keys = Object.keys(result.suggestion || {});
@@ -250,6 +290,15 @@
     (result.messages || []).forEach(function (m) {
       box.appendChild(el("p", { class: "muted", text: m }));
     });
+    // Surface potential duplicates at the TOP of the suggestion panel, right
+    // after the heading, so the user sees them before the "fill the card" controls.
+    if (!manual && (result.existing_matches || []).length) {
+      var banner = duplicateBanner(result, manual);
+      if (banner) {
+        // box.children[0] is the <h3> heading; insert the banner after it.
+        box.insertBefore(banner, box.children[1] || null);
+      }
+    }
     if (result.sources && result.sources.length) {
       box.appendChild(
         el("p", { class: "hint", text: "Sources: " + result.sources.slice(0, 4).join(", ") })

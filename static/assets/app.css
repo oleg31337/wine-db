@@ -387,6 +387,25 @@ main {
 .suggest-item input { width: auto; min-height: auto; margin-top: 0.25rem; }
 .suggest-key { font-weight: 600; text-transform: capitalize; }
 
+/* ---------- duplicate / already-in-collection banner ---------- */
+.dup-banner {
+  border: 1px solid var(--gold);
+  background: #fff8e8;
+  border-radius: var(--radius);
+  padding: 0.7rem 0.8rem;
+  margin: 0.2rem 0 0.6rem;
+}
+.dup-head { font-weight: 600; margin: 0 0 0.25rem; }
+.dup-list { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.dup-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); padding: 0.55rem 0.7rem;
+}
+.dup-info { flex: 1 1 auto; min-width: 0; }
+.dup-name { font-weight: 600; }
+.dup-row .muted { font-size: 0.8rem; }
+
 /* ---------- favorites ---------- */
 .fav-list { display: grid; gap: 0.6rem; }
 .fav-item {

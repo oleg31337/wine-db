@@ -16,10 +16,13 @@ import logging
 import asyncio
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.models import User
-from app.schemas import EnrichRequest, EnrichResponse
+from app.db import get_db
+from app.models import User, Wine
+from app.schemas import EnrichRequest, EnrichResponse, WineOut
 from app.security import current_user, require_csrf
 from app.services import images
 from app.services.enrich import (
@@ -56,6 +59,85 @@ def _filled_fields(form_values: dict) -> set[str]:
         for k, v in form_values.items()
         if v is not None and str(v).strip() != "" and k in ENRICHABLE_FIELDS
     }
+
+
+def _serialize_existing(db: Session, user_id: str, wines: list[Wine]) -> list[WineOut]:
+    """Render a small card preview for the duplicate-check banner.
+
+    We deliberately do NOT pull in comments/favorite-list ids (that's the full
+    WineDetail path). The banner only needs the identifying fields plus the
+    rating summary so the user can recognise the wine and open its real card.
+    """
+    from app.routers.wines import _comment_counts, _my_ratings, _rating_stats
+
+    ids = [w.id for w in wines]
+    stats = _rating_stats(db, ids)
+    mine = _my_ratings(db, user_id, ids)
+    comments = _comment_counts(db, ids)
+    out = []
+    for w in wines:
+        avg, count = stats.get(w.id, (None, 0))
+        out.append(
+            WineOut(
+                id=w.id,
+                name=w.name,
+                maker=w.maker,
+                wine_type=w.wine_type,
+                country=w.country,
+                region=w.region,
+                vintage=w.vintage,
+                grape=w.grape,
+                sugar_g_l=w.sugar_g_l,
+                alcohol_pct=w.alcohol_pct,
+                aromas=w.aromas,
+                acidity=w.acidity,
+                sweetness=w.sweetness,
+                body=w.body,
+                mouthfeel=w.mouthfeel,
+                wood=w.wood,
+                photo_url=f"/api/wines/{w.id}/photo" if w.photo_path else None,
+                created_at=w.created_at,
+                updated_at=w.updated_at,
+                average_rating=avg,
+                rating_count=count,
+                my_rating=mine.get(w.id),
+                comment_count=comments.get(w.id, 0),
+            )
+        )
+    return out
+
+
+def _lookup_existing(
+    db: Session, *, name: str | None, maker: str | None, limit: int = 5
+) -> list[Wine]:
+    """Find wines that look like the one being scanned.
+
+    Match on NAME only (case-insensitive substring), and - when a maker is also
+    known - additionally include maker matches. The VINTAGE/YEAR is intentionally
+    ignored: a 2018 and a 2020 of the same wine are the same entry, and the
+    label reader frequently misreads the year, so matching on it would miss
+    obvious duplicates.
+
+    Results are ordered so an exact maker match ranks above a name-only match.
+    """
+    if not name or not name.strip():
+        return []
+    name_needle = f"%{name.strip().lower()}%"
+    stmt = select(Wine).where(func.lower(Wine.name).like(name_needle, escape="\\"))
+    if maker and maker.strip():
+        maker_needle = f"%{maker.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(func.coalesce(Wine.maker, "")).like(maker_needle, escape="\\")
+        )
+        stmt = stmt.order_by(
+            (
+                func.lower(func.coalesce(Wine.maker, "")).like(maker_needle, escape="\\")
+            ).desc(),
+            Wine.created_at.desc(),
+        )
+    else:
+        stmt = stmt.order_by(Wine.created_at.desc())
+    return list(db.scalars(stmt.limit(limit)))
 
 
 async def _enrich_from_context(
@@ -161,6 +243,7 @@ async def scan_label(
     _user: User = Depends(current_user),
     _: None = Depends(require_csrf),
     settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
 ) -> EnrichResponse:
     raw = await images.read_upload(file, settings.max_upload_bytes)
     ai_bytes, _store_bytes = images.normalize_ingested_image(raw, settings.max_upload_bytes)
@@ -182,6 +265,7 @@ async def scan_label(
     label_text = None
     legible = False
 
+    existing_matches: list[WineOut] = []
     if ai.available:
         try:
             raw_vision = await ai.vision_label(ai_bytes)
@@ -210,6 +294,19 @@ async def scan_label(
         "grape": grape or label_fields.get("grape"),
         "vintage": vintage or label_fields.get("vintage"),
     }
+
+    # After the front label is read, check whether this wine is already in the
+    # collection. Match on name (+ maker when known); never on the vintage/year.
+    # Skip the check for back-label scans - the front label already did it, and a
+    # back label may not name the wine at all.
+    if not is_back_label and (hints["name"] or hints["maker"]):
+        matches = _lookup_existing(db, name=hints["name"], maker=hints["maker"])
+        if matches:
+            existing_matches = _serialize_existing(db, _user.id, matches)
+            messages.append(
+                "This wine may already be in your collection - check the match below "
+                "before saving a duplicate."
+            )
 
     net_suggestion, confidence = await _enrich_from_context(
         settings,
@@ -242,6 +339,7 @@ async def scan_label(
         need_back_label=need_back,
         messages=messages,
         back_label_text=label_text if is_back_label else None,
+        existing_matches=existing_matches,
     )
 
 

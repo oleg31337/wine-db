@@ -267,3 +267,8 @@ class EnrichResponse(BaseModel):
     # Raw text the vision model read from the label. Only populated when this
     # was a back-label scan (is_back_label=True), so the caller can persist it.
     back_label_text: str | None = None
+    # Wines already in the collection that look like the one being scanned.
+    # Matched on name (and maker if known), NEVER the vintage/year - a 2018 and
+    # a 2020 of the same wine are the same entry. The frontend shows these so
+    # the user can open the existing card instead of creating a duplicate.
+    existing_matches: list[WineOut] = []

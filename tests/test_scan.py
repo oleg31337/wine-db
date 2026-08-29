@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from app.services import enrich as enrich_module
-from tests.conftest import make_image
+from tests.conftest import create_wine, make_image
 
 
 @pytest.fixture
@@ -675,5 +675,50 @@ def test_openai_url_normalisation():
     assert enrich_module.AIClient._openai_url("http://192.168.1.222:11434") == (
         "http://192.168.1.222:11434/v1/chat/completions"
     )
+
+
+# --------------------------------------------------------------- duplicate check
+def test_scan_finds_existing_wine_by_name_ignoring_vintage(api, user, fake_ai, no_network):
+    """A front-label scan for a wine already in the DB must surface the existing
+    card, and the match must ignore the label's vintage (a different year of the
+    same wine is still a duplicate candidate)."""
+    # The fake vision reads "Château Mock" 2018; seed an existing 2019 of it.
+    create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
+    body = post_label(api).json()
+    assert body["existing_matches"], "expected an existing-match to be returned"
+    match = body["existing_matches"][0]
+    assert match["name"] == "Château Mock"
+    assert match["vintage"] == 2019  # the stored one, not the label's 2018
+    assert any("in your collection" in m for m in body["messages"])
+
+
+def test_scan_no_match_for_unknown_name(api, user, fake_ai, no_network):
+    body = post_label(api).json()  # vision reads "Château Mock"
+    assert body["existing_matches"] == []
+
+
+def test_scan_does_not_match_for_back_label(api, user, fake_ai, no_network):
+    create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
+    # A back-label scan must NOT run the duplicate lookup (the front already did).
+    body = post_label(api, is_back_label="true").json()
+    assert body["existing_matches"] == []
+
+
+def test_scan_match_is_read_only(api, user, fake_ai, no_network):
+    create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
+    post_label(api)
+    # The lookup must not create a second wine.
+    assert api.get("/api/wines").json()["total"] == 1
+
+
+def test_scan_returns_full_match_fields(api, user, fake_ai, no_network):
+    create_wine(
+        api, name="Château Mock", maker="Domaine Mock", vintage=2019, region="Bordeaux"
+    )
+    match = post_label(api).json()["existing_matches"][0]
+    assert match["id"]
+    assert match["maker"] == "Domaine Mock"
+    assert match["region"] == "Bordeaux"
+    assert match["photo_url"] is None  # no photo was uploaded
 
 
