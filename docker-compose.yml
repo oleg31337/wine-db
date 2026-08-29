@@ -90,7 +90,6 @@ services:
       WEB_SEARCH_ENABLED: ${WEB_SEARCH_ENABLED:-true}
       WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-duckduckgo}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-}
-      OPENFOODFACTS_BASE_URL: ${OPENFOODFACTS_BASE_URL:-https://world.openfoodfacts.org}
 
       # --- Abuse limits (per client IP, per minute)
       RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-8}
