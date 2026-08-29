@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # Default is a single-file SQLite database INSIDE data_dir so everything
     # (db + uploads) lives in one host folder that you can back up / bind-mount.
     # In Docker the compose file overrides this with Postgres.
-    data_dir: str = "./data"
+    data_dir: str = "/data"
     database_url: str = "sqlite:///./data/winedb.sqlite"
 
     # --- Registration ---
@@ -55,7 +55,6 @@ class Settings(BaseSettings):
     admin_password_hash: str | None = None
 
     # --- Uploads ---
-    data_dir: str = "/data"
     max_upload_bytes: int = 8 * 1024 * 1024
     max_backup_bytes: int = 512 * 1024 * 1024
 
