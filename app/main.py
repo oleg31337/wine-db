@@ -68,7 +68,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         for key, value in SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
         if request.url.path.startswith("/api/"):
+            # API responses are never cached - every read goes to the server so
+            # the UI always shows authoritative data after a write.
             response.headers.setdefault("Cache-Control", "no-store")
+        elif request.url.path.startswith("/assets/"):
+            # Assets carry Last-Modified/ETag from StaticFiles but no explicit
+            # Cache-Control, which lets browsers heuristically cache them. Force
+            # revalidation so a freshly rebuilt container always ships its JS -
+            # otherwise a stale detail.js (with old refresh logic) could keep
+            # running after a deploy. Conditional GET keeps it fast.
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
 

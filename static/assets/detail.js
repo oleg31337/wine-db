@@ -267,8 +267,10 @@
 
     function refresh(silent) {
       if (typeof onChanged === "function") onChanged();
+      // Cache-bust so the freshly-saved comment always comes back (browsers/proxies
+      // that honour no-store won't cache, but we don't rely on that).
       W.api
-        .get("/api/wines/" + wineId)
+        .get("/api/wines/" + wineId + "?t=" + Date.now())
         .then(function (wine) {
           paint(wine);
         })
