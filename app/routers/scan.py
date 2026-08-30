@@ -239,6 +239,13 @@ def _lookup_existing(
     return [w for _, w in scored[:limit]]
 
 
+# Large, well-known wine catalogues we scope the web search to. Each is queried
+# in parallel (a site-scoped search per site) so the enrichment gathers facts
+# from several specialised databases at once instead of a single generic web
+# search. Add a domain here to include another catalogue - no other wiring needed.
+_WEB_SOURCES = ("cellartracker.com", "vivino.com", "saq.com")
+
+
 async def _enrich_from_context(
     settings: Settings,
     *,
@@ -260,18 +267,16 @@ async def _enrich_from_context(
     query = " ".join(b for b in query_bits if b).strip()
     web_context, web_sources = await search_web(settings, query) if query else ("", [])
 
-    # Large wine catalogues are queried with site-scoped searches, run in
-    # parallel to save time. SAQ (saq.com) and Vivino (vivino.com) are large
-    # wine databases; their product pages are also considered when the engine
-    # supports site-scoping. No Wikipedia fallback applies to these (a bare
-    # "site:..." would pollute the fallback), and neither has a public API, so
+    # Large wine catalogues are queried with site-scoped searches, all fanned out
+    # in parallel via asyncio.gather so they run simultaneously. CellarTracker,
+    # Vivino and SAQ are large wine databases; their product pages are considered
+    # when the engine supports site-scoping. No Wikipedia fallback applies to these
+    # (a bare "site:..." would pollute the fallback) and none has a public API, so
     # each simply contributes nothing when the primary engine is unavailable.
+    # The list of sites lives in _WEB_SOURCES.
     if query:
-        saq_task = search_web(settings, query + " site:saq.com")
-        vivino_task = search_web(settings, query + " site:vivino.com")
-        saq_context, saq_sources = await saq_task
-        vivino_context, vivino_sources = await vivino_task
-        for ctx, src in ((saq_context, saq_sources), (vivino_context, vivino_sources)):
+        site_tasks = [search_web(settings, f"{query} site:{site}") for site in _WEB_SOURCES]
+        for ctx, src in await asyncio.gather(*site_tasks):
             if ctx:
                 web_context = (web_context + "\n" + ctx).strip()
                 web_sources = web_sources + src

@@ -343,16 +343,18 @@ def test_web_search_can_fill_structure_gauges(api, user, fake_ai, monkeypatch):
     assert all(0 <= (s.get(g) or 0) <= 3 for g in ("acidity", "sweetness", "body", "mouthfeel", "wood"))
 
 
-def test_saq_and_vivino_are_searched_alongside_general_web(api, user, fake_ai, monkeypatch):
-    """SAQ (saq.com) and Vivino (vivino.com) are large wine databases, so the
-    lookup also runs site-scoped searches (in parallel) and merges their
-    results into the suggestion."""
+def test_catalogue_sites_are_searched_alongside_general_web(api, user, fake_ai, monkeypatch):
+    """CellarTracker (cellartracker.com), Vivino (vivino.com) and SAQ (saq.com) are
+    large wine databases, so the lookup also runs a site-scoped search against each
+    of them *in parallel* and merges their results into the suggestion."""
     import app.routers.scan as scan_router
 
     seen = []
 
     async def fake_search(settings, query):
         seen.append(query)
+        if "site:cellartracker.com" in query:
+            return "CellarTracker: a Napa Cabernet, full-bodied, oak-aged.", ["https://www.cellartracker.com/wine/123"]
         if "site:saq.com" in query:
             return "SAQ product page: a dry red from Bordeaux, full-bodied.", ["https://www.saq.com/en/123"]
         if "site:vivino.com" in query:
@@ -372,7 +374,8 @@ def test_saq_and_vivino_are_searched_alongside_general_web(api, user, fake_ai, m
     monkeypatch.setattr(scan_router, "summarize_search", fake_summarize)
     monkeypatch.setattr(enrich_module, "summarize_search", fake_summarize)
     body = api.post("/api/scan/lookup", json={"name": "Chateau Test", "maker": "Test"}).json()
-    # A general, a saq.com-scoped, and a vivino.com-scoped query were issued.
+    # A general query plus a site-scoped query for EACH of the three catalogues.
+    assert any("site:cellartracker.com" in q for q in seen), seen
     assert any("site:saq.com" in q for q in seen), seen
     assert any("site:vivino.com" in q for q in seen), seen
     assert any("Chateau Test" in q for q in seen), seen
