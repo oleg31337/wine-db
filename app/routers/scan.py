@@ -11,10 +11,11 @@ suggested.
 
 from __future__ import annotations
 
-import logging
-
 import asyncio
 import httpx
+import logging
+import re
+import unicodedata
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -107,37 +108,135 @@ def _serialize_existing(db: Session, user_id: str, wines: list[Wine]) -> list[Wi
     return out
 
 
+# Words that carry almost no identifying power on a wine label (the word
+# "chateau"/"domaine"/"estate" appears on thousands of different wines) or are
+# noise. We still keep them for context but require a *strong* token to match.
+_WEAK_TOKENS = {
+    "chateau", "château", "domaine", "estate", "winery", "the", "de", "du",
+    "des", "la", "le", "les", "of", "and", "reserve", "reserva", "cuvée",
+    "cuvee", "grand", "vineyard", "family", "maison", "cantina", "weingut",
+    "bodega", "cellars", "cellar", "vignobles", "vignerons", "clos", "castello",
+    "tenuta", "abbey", "house",
+}
+
+
+def _fold(text: str) -> str:
+    """Lowercase + strip accents so "Château" and "Chateau" compare equal."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", str(text))
+    return "".join(c for c in normalized if not unicodedata.combining(c)).lower()
+
+
+def _significant_tokens(text: str) -> set[str]:
+    """Accent-folded, de-pluralised tokens of a name, minus weak/short words."""
+    folded = _fold(text)
+    words = re.split(r"[^a-z0-9]+", folded)
+    out = set()
+    for w in words:
+        if not w or len(w) < 3:
+            continue
+        if w in _WEAK_TOKENS:
+            continue
+        # crude singular form so "commanderie"/"commanderies" align
+        if w.endswith("s") and len(w) > 4:
+            w = w[:-1]
+        out.add(w)
+    return out
+
+
+def _lev(a: str, b: str) -> int:
+    """Classic Levenshtein edit distance (cheap; tokens are short)."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _tokens_match(stored_tok: str, vision_tok: str) -> bool:
+    """True when two significant tokens are the same OR close enough that a label
+    misread (one dropped/accented letter) would explain the difference."""
+    if stored_tok == vision_tok:
+        return True
+    n = max(len(stored_tok), len(vision_tok))
+    if n < 4:
+        return False
+    # allow 1 edit for short words, 2 for longer ones
+    return _lev(stored_tok, vision_tok) <= (1 if n <= 6 else 2)
+
+
+def _name_similarity(a: str, b: str) -> float:
+    """Token-overlap ratio in [0, 1] between two wine names.
+
+    Uses the *smaller* set of significant tokens as the denominator so a truncated
+    label reading ("commanderie bardélet") still scores 1.0 against the full
+    stored name ("château la commanderie du bardélet"), while an unrelated name
+    scores ~0. Token comparison is edit-distance tolerant so a single-name label
+    read with a typo (e.g. vision "Roussane" vs stored "Roussanne") still matches.
+    """
+    ta, tb = _significant_tokens(a), _significant_tokens(b)
+    if not ta or not tb:
+        return 0.0
+    matched = 0
+    for vtok in ta:
+        if any(_tokens_match(stok, vtok) for stok in tb):
+            matched += 1
+    denom = min(len(ta), len(tb))
+    return matched / denom
+
+
 def _lookup_existing(
     db: Session, *, name: str | None, maker: str | None, limit: int = 5
 ) -> list[Wine]:
     """Find wines that look like the one being scanned.
 
-    Match on NAME only (case-insensitive substring), and - when a maker is also
-    known - additionally include maker matches. The VINTAGE/YEAR is intentionally
-    ignored: a 2018 and a 2020 of the same wine are the same entry, and the
-    label reader frequently misreads the year, so matching on it would miss
-    obvious duplicates.
+    Matching is deliberately LOOSE: the vision model frequently drops accents,
+    truncates long names, or returns only part of the label. We accent-fold both
+    sides and compare on *significant* token overlap, ignoring the vintage/year
+    entirely (a 2018 and a 2020 of the same wine are the same entry).
 
-    Results are ordered so an exact maker match ranks above a name-only match.
+    A "significant token" is any lowercased, accent-stripped word of >= 3 chars
+    that isn't a generic wine-word (château, domaine, de, la, ...). The score is
+    the fraction of the *shorter* name's significant tokens that also appear in
+    the other name, so a partial label reading still matches the full stored name.
     """
     if not name or not name.strip():
+        # Without a name we can only fall back to an exact maker match.
+        if maker and maker.strip():
+            m = f"%{maker.strip().lower()}%"
+            return list(
+                db.scalars(
+                    select(Wine)
+                    .where(func.lower(func.coalesce(Wine.maker, "")).like(m, escape="\\"))
+                    .order_by(Wine.created_at.desc())
+                    .limit(limit)
+                )
+            )
         return []
-    name_needle = f"%{name.strip().lower()}%"
-    stmt = select(Wine).where(func.lower(Wine.name).like(name_needle, escape="\\"))
-    if maker and maker.strip():
-        maker_needle = f"%{maker.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(func.coalesce(Wine.maker, "")).like(maker_needle, escape="\\")
-        )
-        stmt = stmt.order_by(
-            (
-                func.lower(func.coalesce(Wine.maker, "")).like(maker_needle, escape="\\")
-            ).desc(),
-            Wine.created_at.desc(),
-        )
-    else:
-        stmt = stmt.order_by(Wine.created_at.desc())
-    return list(db.scalars(stmt.limit(limit)))
+
+    candidates = db.scalars(
+        select(Wine).where(Wine.name.is_not(None)).order_by(Wine.created_at.desc()).limit(200)
+    ).all()
+
+    scored = []
+    for w in candidates:
+        score = _name_similarity(w.name, name)
+        if maker and maker.strip():
+            if _fold(maker.strip()) in _fold(w.maker or ""):
+                score = max(score, 0.9)
+        if score >= 0.5:
+            scored.append((score, w))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [w for _, w in scored[:limit]]
 
 
 async def _enrich_from_context(

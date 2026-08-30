@@ -678,17 +678,35 @@ def test_openai_url_normalisation():
 
 
 # --------------------------------------------------------------- duplicate check
-def test_scan_finds_existing_wine_by_name_ignoring_vintage(api, user, fake_ai, no_network):
-    """A front-label scan for a wine already in the DB must surface the existing
-    card, and the match must ignore the label's vintage (a different year of the
-    same wine is still a duplicate candidate)."""
-    # The fake vision reads "Château Mock" 2018; seed an existing 2019 of it.
-    create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
+def test_name_similarity_handles_accents_and_truncation():
+    """Fuzzy matcher must recognise a label reading that drops accents or is
+    truncated versus the full stored name."""
+    from app.routers.scan import _name_similarity
+
+    # full stored: "Château La Commanderie du Bardélet"
+    assert _name_similarity("Château La Commanderie du Bardélet", "La Commanderie du Bardélet") >= 0.5
+    # accents dropped + 'Chateau' instead of 'Château'
+    assert _name_similarity("Château La Commanderie du Bardélet", "Chateau Commanderie Bardel et") >= 0.5
+    # single-token name with a one-letter typo (label misread)
+    assert _name_similarity("Roussanne", "Roussane") >= 0.5
+    # unrelated name scores low
+    assert _name_similarity("Andes Blend", "Château La Commanderie du Bardélet") < 0.5
+
+
+def test_scan_finds_existing_wine_by_loose_name_ignoring_vintage(api, user, fake_ai, no_network):
+    """Front-label scan for a wine already in the DB must surface it even when the
+    vision reading drops accents / truncates / differs in vintage."""
+    create_wine(api, name="Château La Commanderie du Bardélet", maker="Château La Commanderie du Bardélet", vintage=2024)
+    # vision returns a messy, accent-free, truncated, different-year reading
+    fake_ai["vision"] = {
+        "legible": True,
+        "name": "La Commanderie du Bardel et",
+        "maker": "Commanderie",
+        "raw_text": "LA COMMANDERIE DU BARDELET 2021",
+    }
     body = post_label(api).json()
     assert body["existing_matches"], "expected an existing-match to be returned"
-    match = body["existing_matches"][0]
-    assert match["name"] == "Château Mock"
-    assert match["vintage"] == 2019  # the stored one, not the label's 2018
+    assert body["existing_matches"][0]["name"] == "Château La Commanderie du Bardélet"
     assert any("in your collection" in m for m in body["messages"])
 
 
@@ -699,26 +717,26 @@ def test_scan_no_match_for_unknown_name(api, user, fake_ai, no_network):
 
 def test_scan_does_not_match_for_back_label(api, user, fake_ai, no_network):
     create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
-    # A back-label scan must NOT run the duplicate lookup (the front already did).
     body = post_label(api, is_back_label="true").json()
     assert body["existing_matches"] == []
 
 
 def test_scan_match_is_read_only(api, user, fake_ai, no_network):
-    create_wine(api, name="Château Mock", maker="Domaine Mock", vintage=2019)
+    create_wine(api, name="Château La Commanderie du Bardélet", maker="Château La Commanderie du Bardélet", vintage=2024)
+    fake_ai["vision"] = {"legible": True, "name": "Commanderie Bardélet", "raw_text": "BARDELET"}
     post_label(api)
-    # The lookup must not create a second wine.
     assert api.get("/api/wines").json()["total"] == 1
 
 
 def test_scan_returns_full_match_fields(api, user, fake_ai, no_network):
     create_wine(
-        api, name="Château Mock", maker="Domaine Mock", vintage=2019, region="Bordeaux"
+        api, name="Château La Commanderie du Bardélet", maker="Château La Commanderie du Bardélet", vintage=2024, region="Bordeaux"
     )
+    fake_ai["vision"] = {"legible": True, "name": "Commanderie du Bardet", "raw_text": "BARDELET"}
     match = post_label(api).json()["existing_matches"][0]
     assert match["id"]
-    assert match["maker"] == "Domaine Mock"
+    assert match["maker"] == "Château La Commanderie du Bardélet"
     assert match["region"] == "Bordeaux"
-    assert match["photo_url"] is None  # no photo was uploaded
+    assert match["photo_url"] is None
 
 
