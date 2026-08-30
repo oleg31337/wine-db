@@ -10,6 +10,8 @@
   var manualMode = false;
   var isBackLabel = false;
   var refreshHook = null;
+  // Which picker produced the current photo, so "Retake" can reopen the same one.
+  var lastCaptureSource = null; // "camera" | "file"
   // The in-progress new-wine form. Kept at module scope so a back-label scan
   // can MERGE its data into the same card instead of opening a fresh one and
   // silently dropping what the front label already filled in.
@@ -54,6 +56,27 @@
     $("#btn-cam-start").classList.remove("hidden");
     $("#scan-idle").classList.remove("hidden");
     hint("");
+  }
+
+  /* Undo the current capture and reopen the same picker, so the user can have
+     another go at the photo instead of being stuck with a bad frame. */
+  function retake() {
+    capturedBlob = null;
+    var preview = $("#scan-preview");
+    if (preview.src && preview.src.indexOf("blob:") === 0) URL.revokeObjectURL(preview.src);
+    preview.classList.add("hidden");
+    preview.removeAttribute("src");
+    $("#suggest-panel").classList.add("hidden");
+    $("#suggest-panel").innerHTML = "";
+    hint("");
+    if (lastCaptureSource === "camera" && cameraSupported()) {
+      startCamera();
+    } else if (lastCaptureSource === "file") {
+      var fi = $("#file-input");
+      if (fi) fi.click();
+    } else if (cameraSupported()) {
+      startCamera();
+    }
   }
 
   function secureContext() {
@@ -151,6 +174,49 @@
     $("#scan-idle").classList.add("hidden");
   }
 
+  // The label reticle is drawn at inset 12% top/bottom, 8% left/right of the
+  // stage. Crop any captured image to that same rectangle so the vision model
+  // receives a tight label shot instead of a whole-bottle / background frame.
+  // Lightweight: just a canvas crop, no re-encode beyond the JPEG we already make.
+  function cropToLabel(blob) {
+    return new Promise(function (resolve) {
+      if (!blob || !blob.type || blob.type.indexOf("image") !== 0) {
+        resolve(blob);
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      var im = new Image();
+      im.onload = function () {
+        try {
+          var left = Math.round(im.naturalWidth * 0.08);
+          var top = Math.round(im.naturalHeight * 0.12);
+          var w = Math.round(im.naturalWidth * 0.84);
+          var h = Math.round(im.naturalHeight * 0.76);
+          var canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d").drawImage(im, left, top, w, h, 0, 0, w, h);
+          canvas.toBlob(
+            function (out) {
+              URL.revokeObjectURL(url);
+              resolve(out || blob);
+            },
+            "image/jpeg",
+            0.9
+          );
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          resolve(blob);
+        }
+      };
+      im.onerror = function () {
+        URL.revokeObjectURL(url);
+        resolve(blob);
+      };
+      im.src = url;
+    });
+  }
+
   /* Attach a photo in manual-add mode WITHOUT any AI enrichment. Just resize
      it in-browser, keep it as the capturedBlob (uploaded on save), and show a
      thumbnail. The user fills the card's text fields themselves. */
@@ -174,7 +240,8 @@
   }
 
   /* Send the photo to the server for vision + internet enrichment. */
-  function analyze(blob, manual) {
+  function analyze(blob, manual, source) {
+    lastCaptureSource = source || lastCaptureSource;
     // The back label is scanned for its TEXT only; the wine picture in the
     // database must stay the FRONT label, so never let a back-label capture
     // overwrite the captured photo.
@@ -183,7 +250,17 @@
     var panel = $("#suggest-panel");
     panel.classList.remove("hidden");
     W.clear(panel).appendChild(
-      el("div", { class: "card" }, [W.loadingRow("Reading the label with the AI model…")])
+      el("div", { class: "card" }, [
+        W.loadingRow("Reading the label with the AI model…"),
+        el("div", { class: "pill-row", style: "margin-top:0.6rem" }, [
+          el("button", {
+            type: "button",
+            class: "btn-sm btn-quiet",
+            text: "↺ Retake",
+            onclick: function () { retake(); },
+          }),
+        ]),
+      ])
     );
 
     // Shrink the image in-browser so it clears the reverse proxy's
@@ -211,14 +288,18 @@
           );
           return;
         }
-        var fd = new FormData();
-        fd.append("file", resized, "label.jpg");
-        fd.append("is_back_label", isBackLabel ? "true" : "false");
+        // Tighten the shot to the label rectangle before uploading.
+        return cropToLabel(resized).then(function (cropped) {
+          if (!isBackLabel) capturedBlob = cropped;
+          var fd = new FormData();
+          fd.append("file", cropped, "label.jpg");
+          fd.append("is_back_label", isBackLabel ? "true" : "false");
 
-        return W.api.post("/api/scan/label", { form: fd })
-          .then(function (result) {
-            openCardWithSuggestion(result, manual);
-          });
+          return W.api.post("/api/scan/label", { form: fd })
+            .then(function (result) {
+              openCardWithSuggestion(result, manual);
+            });
+        });
       })
       .catch(function (err) {
         W.clear(panel).appendChild(
@@ -280,6 +361,37 @@
   function suggestionSummary(result, form, manual) {
     var box = el("div", { class: "suggest-box" });
     var keys = Object.keys(result.suggestion || {});
+    // When the vision model said it couldn't read the label, lead with a clear
+    // retry prompt instead of dumping empty suggestions the user can't act on.
+    if (result.legible === false) {
+      var warn = el("div", { class: "dup-banner", style: "border-color:var(--line-strong);background:#fff8e8" }, [
+        el("p", { class: "dup-head", text: "Couldn't read this label clearly" }),
+        el("p", { class: "muted", text: "The photo may be blurry,angled or poorly lit. Try again with a steadier,straighter shot,or fill the card by hand." }),
+      ]);
+      var retakeBtn = el("button", {
+        type: "button",
+        class: "btn-sm btn-primary",
+        text: "↺ Retake photo",
+        style: "margin-right:0.4rem",
+        onclick: function () { retake(); },
+      });
+      var manualBtn = el("button", {
+        type: "button",
+        class: "btn-sm",
+        text: "Fill card by hand",
+        onclick: function () {
+          openCardWithSuggestion({ suggestion: {}, messages: [], sources: [], legible: true }, manual);
+        },
+      });
+      warn.appendChild(el("div", { class: "pill-row", style: "margin-top:0.4rem" }, [retakeBtn, manualBtn]));
+      box.appendChild(warn);
+      // Still surface any duplicate matches even when illegible.
+      if ((result.existing_matches || []).length) {
+        var banner = duplicateBanner(result, manual);
+        if (banner) box.appendChild(banner);
+      }
+      return box;
+    }
     box.appendChild(
       el("h3", {
         text: keys.length
@@ -400,7 +512,13 @@
       currentForm = form;
     }
 
-    var body = el("div", {}, [suggestionSummary(result, form, manual), el("div", { style: "height:0.9rem" }), form.node]);
+    var summaryBox = suggestionSummary(result, form, manual);
+    var body = el("div", {}, [summaryBox, el("div", { style: "height:0.9rem" }), form.node]);
+
+    // Suggestion #6: in manual-add mode there is no photo to scan, but we still
+    // want the same "already in your collection" warning. Live-check the typed
+    // name/maker against the collection as the user types.
+    if (manual) setupManualDupCheck(form, summaryBox);
 
     var save = el("button", {
       type: "button",
@@ -459,12 +577,51 @@
     if (!form.inputs.name.value) form.focusName();
   }
 
+  /* Debounced live duplicate check for manual-add. Reuses the exact same
+     backend matcher as the scan flow (POST /api/scan/dupcheck). */
+  function setupManualDupCheck(form, summaryBox) {
+    var timer = null;
+    function run() {
+      var name = (form.inputs.name.value || "").trim();
+      var maker = (form.inputs.maker.value || "").trim();
+      if (name.length < 3 && maker.length < 3) {
+        clearManualDupBanner(summaryBox);
+        return;
+      }
+      W.api
+        .post("/api/scan/dupcheck", { json: { name: name || null, maker: maker || null } })
+        .then(function (res) {
+          clearManualDupBanner(summaryBox);
+          if (res && (res.existing_matches || []).length) {
+            var banner = duplicateBanner(res, true);
+            if (banner) {
+              banner.classList.add("dup-manual");
+              summaryBox.insertBefore(banner, summaryBox.firstChild);
+            }
+          }
+        })
+        .catch(function () { /* non-fatal: dup check is a courtesy */ });
+    }
+    function schedule() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(run, 400);
+    }
+    form.inputs.name.addEventListener("input", schedule);
+    form.inputs.maker.addEventListener("input", schedule);
+  }
+
+  function clearManualDupBanner(summaryBox) {
+    if (!summaryBox) return;
+    W.$$(".dup-manual", summaryBox).forEach(function (n) { n.remove(); });
+  }
+
   function reset() {
     capturedBlob = null;
     isBackLabel = false;
     currentForm = null;
     pendingBackText = "";
     manualMode = false;
+    lastCaptureSource = null;
     $("#scan-preview").classList.add("hidden");
     $("#suggest-panel").classList.add("hidden");
     stopCamera();
@@ -498,7 +655,8 @@
           return;
         }
         stopCamera();
-        analyze(blob);
+        lastCaptureSource = "camera";
+        analyze(blob, false, "camera");
       });
     });
 
@@ -509,7 +667,8 @@
         W.toast("That image is too large (max ~8 MB after processing).", "err");
         return;
       }
-      analyze(file);
+      lastCaptureSource = "file";
+      analyze(file, false, "file");
       ev.target.value = "";
     });
 

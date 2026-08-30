@@ -444,6 +444,7 @@ async def scan_label(
         messages=messages,
         back_label_text=label_text if is_back_label else None,
         existing_matches=existing_matches,
+        legible=legible,
     )
 
 
@@ -481,6 +482,41 @@ async def scan_lookup(
         confidence=confidence,
         need_back_label=need_back,
         messages=messages,
+    )
+
+
+@router.post("/dupcheck", response_model=EnrichResponse)
+async def scan_dupcheck(
+    payload: EnrichRequest,
+    _user: User = Depends(current_user),
+    _: None = Depends(require_csrf),
+    db: Session = Depends(get_db),
+) -> EnrichResponse:
+    """Read-only duplicate lookup used by manual-add.
+
+    The manual-add card has no photo, so there is nothing to enrich - the user
+    fills the fields themselves. But we still want to warn them if a wine with
+    the same name (ignoring vintage) is already in the collection, exactly like
+    the scan flow does after reading the front label. This reuses the same
+    _lookup_existing matcher; it performs NO writes and NO AI/web calls.
+    """
+    name = (payload.name or "").strip() or None
+    maker = (payload.maker or "").strip() or None
+    matches = _lookup_existing(db, name=name, maker=maker)
+    existing_matches = _serialize_existing(db, _user.id, matches) if matches else []
+    messages = []
+    if existing_matches:
+        messages.append(
+            "This wine may already be in your collection - check the match below "
+            "before saving a duplicate."
+        )
+    return EnrichResponse(
+        suggestion={},
+        sources=[],
+        confidence="low",
+        need_back_label=False,
+        messages=messages,
+        existing_matches=existing_matches,
     )
 
 

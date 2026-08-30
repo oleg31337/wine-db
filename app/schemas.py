@@ -272,3 +272,7 @@ class EnrichResponse(BaseModel):
     # a 2020 of the same wine are the same entry. The frontend shows these so
     # the user can open the existing card instead of creating a duplicate.
     existing_matches: list[WineOut] = []
+    # Whether the vision model could actually read the label. When False the
+    # frontend shows a "couldn't read this clearly" prompt instead of dumping
+    # empty suggestions, so the user retries or fills the card by hand.
+    legible: bool = False

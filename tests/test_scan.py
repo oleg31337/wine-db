@@ -743,3 +743,28 @@ def test_scan_returns_full_match_fields(api, user, fake_ai, no_network):
     assert match["photo_url"] is None
 
 
+def test_dupcheck_endpoint_matches_manual_add(api, user, no_network):
+    """The manual-add path has no photo, but POST /api/scan/dupcheck must still
+    surface an existing wine by name (vintage ignored), reusing the scan matcher."""
+    create_wine(api, name="Château La Commanderie du Bardélet", maker="Château La Commanderie du Bardélet", vintage=2024)
+    body = api.post("/api/scan/dupcheck", json={"name": "Commanderie Bardélet", "maker": None}).json()
+    assert body["existing_matches"], "dupcheck should find the existing wine"
+    assert body["existing_matches"][0]["name"] == "Château La Commanderie du Bardélet"
+    assert body["suggestion"] == {}  # no enrichment, read-only
+
+
+def test_dupcheck_endpoint_no_match(api, user, no_network):
+    create_wine(api, name="Andes Blend", maker="Finca El Origen", vintage=2023)
+    body = api.post("/api/scan/dupcheck", json={"name": "Totally New Wine 1234", "maker": None}).json()
+    assert body["existing_matches"] == []
+
+
+def test_scan_label_returns_legible_flag(api, user, fake_ai, no_network):
+    """The frontend needs the vision model's legible flag to decide whether to
+    show a 'couldn't read this' retry prompt. It must be present in the response."""
+    # Legible reading
+    fake_ai["vision"] = {"legible": True, "name": "Château Mock", "raw_text": "MOCK"}
+    assert post_label(api).json()["legible"] is True
+    # Illegible reading -> flag False, and the frontend can prompt a retry.
+    fake_ai["vision"] = {"legible": False, "name": None, "raw_text": ""}
+    assert post_label(api).json()["legible"] is False
