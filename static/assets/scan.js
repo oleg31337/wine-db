@@ -338,8 +338,10 @@
         class: "btn-sm btn-primary",
         text: "Open existing card",
         onclick: function () {
-          // Close this scan modal and open the real wine detail sheet.
+          // Close this scan/modal, land on the Browse page, then open the real
+          // wine card there (don't keep editing the new-wine form).
           W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
+          if (W.switchView) W.switchView("browse");
           if (W.openWine) W.openWine(w.id, W.me, function () { if (refreshHook) refreshHook(); });
           else W.toast("Could not open that wine", "err");
         },
