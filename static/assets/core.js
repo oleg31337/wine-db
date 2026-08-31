@@ -207,11 +207,14 @@
       openModals = openModals.filter(function (m) {
         return m !== handle;
       });
+      // Only release the page scroll when the LAST modal closes.
+      if (!openModals.length) document.body.classList.remove("modal-open");
       if (typeof opts.onClose === "function") opts.onClose();
     }
 
     document.addEventListener("keydown", onKey);
     root.appendChild(backdrop);
+    document.body.classList.add("modal-open");
     var focusable = panel.querySelector("input, select, textarea, button.btn-primary");
     if (focusable) setTimeout(function () { focusable.focus(); }, 30);
 

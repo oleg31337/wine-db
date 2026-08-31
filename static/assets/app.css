@@ -147,7 +147,7 @@ label { display: block; font-size: 0.82rem; color: var(--ink-soft); margin-botto
 main {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 1rem 0.9rem calc(var(--tabbar-h) + 1.5rem);
+  padding: 1rem 0.9rem calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1.5rem);
 }
 @media (min-width: 900px) {
   main { padding-bottom: 2rem; }
@@ -159,7 +159,9 @@ main {
 
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
-  height: var(--tabbar-h);
+  /* Height grows by the home-indicator inset so the buttons never get
+     squeezed (border-box would otherwise eat the safe-area padding). */
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
@@ -179,7 +181,9 @@ main {
     height: auto; border-top: none; border-bottom: 1px solid var(--line);
     grid-template-columns: repeat(4, max-content);
     max-width: 1180px; margin: 0 auto; gap: 0.25rem; padding: 0.4rem 0.9rem;
-    background: transparent;
+    /* Opaque background so content scrolling underneath never shows through
+       the sticky bar (it sat transparent before). */
+    background: var(--bg);
   }
   .tabbar button { flex-direction: row; font-size: 0.9rem; padding: 0.4rem 0.9rem; border-radius: 999px; }
 }
@@ -359,7 +363,7 @@ main {
 /* ---------- scan ---------- */
 .scan-stage {
   position: relative; background: #2b2723; border-radius: var(--radius);
-  overflow: hidden; aspect-ratio: 3 / 4; max-height: 50vh;
+  overflow: hidden; aspect-ratio: 3 / 4; max-height: 50vh; max-height: 50dvh;
   display: flex; align-items: center; justify-content: center;
 }
 .scan-stage video, .scan-stage img { width: 100%; height: 100%; object-fit: cover; }
@@ -419,9 +423,13 @@ main {
 }
 .fav-item .fav-name { font-weight: 600; }
 .fav-item .fav-count { margin-left: auto; font-size: 0.8rem; color: var(--ink-faint); }
-.fav-pick { display: grid; gap: 0.35rem; max-height: 40vh; overflow: auto; }
+.fav-pick { display: grid; gap: 0.35rem; max-height: 40vh; max-height: 40dvh; overflow: auto; }
 
 /* ---------- modal / sheet ---------- */
+/* Lock the page scroll while a modal is open so the background never scrolls
+   behind the sheet (on iOS this also prevents the URL bar from collapsing and
+   shifting the sheet mid-interaction). */
+body.modal-open { overflow: hidden; }
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 60;
   background: rgba(45, 39, 35, 0.42);
@@ -433,10 +441,18 @@ main {
 .modal {
   background: var(--surface); width: 100%; max-width: 640px;
   border-radius: var(--radius) var(--radius) 0 0;
-  max-height: 92vh; overflow: auto;
+  /* dvh = the *visible* viewport on mobile (URL bar / toolbars excluded).
+     Plain vh on iOS is the layout viewport, which is taller than what is on
+     screen, so a 92vh bottom sheet had its top (and the close ✕) pushed above
+     the visible area. dvh fixes that; vh stays as the fallback for older
+     browsers that don't know dvh. */
+  max-height: 92vh;
+  max-height: 92dvh;
+  overflow: auto;
   box-shadow: var(--shadow); border: 1px solid var(--line);
+  overscroll-behavior: contain;
 }
-@media (min-width: 700px) { .modal { border-radius: var(--radius); max-height: 88vh; } }
+@media (min-width: 700px) { .modal { border-radius: var(--radius); max-height: 88vh; max-height: 88dvh; } }
 .modal-head {
   position: sticky; top: 0; background: var(--surface);
   display: flex; align-items: center; gap: 0.5rem;
@@ -453,7 +469,7 @@ main {
 /* ---------- toast ---------- */
 .toasts {
   position: fixed; z-index: 90; left: 0.75rem; right: 0.75rem;
-  bottom: calc(var(--tabbar-h) + 0.75rem);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 0.75rem);
   display: grid; gap: 0.4rem; pointer-events: none;
 }
 @media (min-width: 700px) { .toasts { left: auto; right: 1rem; bottom: 1rem; width: 360px; } }
@@ -467,7 +483,7 @@ main {
 
 /* ---------- auth ---------- */
 .auth-wrap {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
   padding: 1.25rem; background: radial-gradient(120% 80% at 50% 0%, #efe6da, var(--bg));
 }
 .auth-card { width: 100%; max-width: 400px; }
