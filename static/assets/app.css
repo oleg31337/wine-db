@@ -375,6 +375,10 @@ main {
 }
 .scan-actions { display: grid; gap: 0.5rem; grid-template-columns: 1fr 1fr; margin-top: 0.75rem; }
 .scan-actions .full { grid-column: 1 / -1; }
+/* Icon-only camera controls sit in a centered row so they read as a toolbar
+   rather than stretching across the grid. */
+.scan-icon-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; justify-content: center; }
+.scan-icon-actions .btn { width: 48px; height: 48px; padding: 0; font-size: 1.25rem; border-radius: 50%; }
 .manual-thumb {
   display: block; width: 100%; max-width: 200px; aspect-ratio: 3 / 4;
   object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line);

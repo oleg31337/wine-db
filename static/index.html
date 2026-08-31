@@ -164,7 +164,6 @@
     <!-- ---- scan / add ---- -->
     <section id="view-scan" class="view" role="tabpanel" aria-label="Add a wine">
       <div class="card">
-        <h2>Add a wine</h2>
         <div class="scan-stage" id="scan-stage">
           <video id="scan-video" playsinline muted class="hidden"></video>
           <img id="scan-preview" class="hidden" alt="Captured label" />
@@ -177,9 +176,11 @@
 
         <div class="scan-actions">
           <button type="button" id="btn-cam-start" class="btn-primary full">Start camera</button>
-          <button type="button" id="btn-capture" class="btn-primary hidden">📷 Capture label</button>
-          <button type="button" id="btn-cam-stop" class="hidden">Stop camera</button>
-          <button type="button" id="btn-cam-flip" class="hidden">Flip camera</button>
+          <div class="scan-icon-actions hidden" id="scan-icon-actions">
+            <button type="button" id="btn-capture" class="btn-primary" aria-label="Capture label">📷</button>
+            <button type="button" id="btn-cam-stop" aria-label="Stop camera">■</button>
+            <button type="button" id="btn-cam-flip" aria-label="Flip camera">🔄</button>
+          </div>
           <label class="btn full" for="file-input" style="cursor:pointer">
             Choose a photo instead
             <input id="file-input" type="file" accept="image/*" capture="environment"

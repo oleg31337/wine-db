@@ -53,6 +53,7 @@
     $("#btn-capture").classList.add("hidden");
     $("#btn-cam-stop").classList.add("hidden");
     $("#btn-cam-flip").classList.add("hidden");
+    $("#scan-icon-actions").classList.add("hidden");
     $("#btn-cam-start").classList.remove("hidden");
     $("#scan-idle").classList.remove("hidden");
     hint("");
@@ -131,6 +132,7 @@
         $("#btn-capture").classList.remove("hidden");
         $("#btn-cam-stop").classList.remove("hidden");
         $("#btn-cam-flip").classList.remove("hidden");
+        $("#scan-icon-actions").classList.remove("hidden");
         $("#btn-cam-start").classList.add("hidden");
         hint("Capture the label — or choose a photo below.");
       })
