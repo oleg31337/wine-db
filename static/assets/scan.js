@@ -134,7 +134,6 @@
         $("#btn-cam-flip").classList.remove("hidden");
         $("#scan-icon-actions").classList.remove("hidden");
         $("#btn-cam-start").classList.add("hidden");
-        hint("Capture the label — or choose a photo below.");
       })
       .catch(function (err) {
         var msg =
