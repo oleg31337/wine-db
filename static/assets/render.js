@@ -205,9 +205,9 @@
     ]);
   };
 
-  W.loadingRow = function (label) {
+  W.loadingRow = function (label, big) {
     return el("div", { class: "loading-row" }, [
-      el("span", { class: "spinner", "aria-hidden": "true" }),
+      el("span", { class: "spinner" + (big ? " spinner-lg" : ""), "aria-hidden": "true" }),
       el("span", { text: label || "Loading…" }),
     ]);
   };

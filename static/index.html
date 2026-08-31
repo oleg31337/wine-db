@@ -60,7 +60,7 @@
       <span class="ico" aria-hidden="true">★</span><span>Favorites</span>
     </button>
     <button type="button" role="tab" data-view="scan" aria-selected="false">
-      <span class="ico" aria-hidden="true">📷</span><span>Add wine</span>
+      <span class="ico" aria-hidden="true">➕</span><span>Add wine</span>
     </button>
     <button type="button" role="tab" data-view="data" data-admin="1" aria-selected="false">
       <span class="ico" aria-hidden="true">🗄</span><span>Data</span>
@@ -165,11 +165,6 @@
     <section id="view-scan" class="view" role="tabpanel" aria-label="Add a wine">
       <div class="card">
         <h2>Add a wine</h2>
-        <p class="muted">
-          Point the camera at the bottle. The label is read by the AI model on the server.
-          Everything found is only a suggestion — you stay in control of every field.
-        </p>
-
         <div class="scan-stage" id="scan-stage">
           <video id="scan-video" playsinline muted class="hidden"></video>
           <img id="scan-preview" class="hidden" alt="Captured label" />
@@ -182,7 +177,7 @@
 
         <div class="scan-actions">
           <button type="button" id="btn-cam-start" class="btn-primary full">Start camera</button>
-          <button type="button" id="btn-capture" class="btn-primary hidden">Capture label</button>
+          <button type="button" id="btn-capture" class="btn-primary hidden">📷 Capture label</button>
           <button type="button" id="btn-cam-stop" class="hidden">Stop camera</button>
           <button type="button" id="btn-cam-flip" class="hidden">Flip camera</button>
           <label class="btn full" for="file-input" style="cursor:pointer">

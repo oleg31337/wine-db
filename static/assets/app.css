@@ -359,7 +359,7 @@ main {
 /* ---------- scan ---------- */
 .scan-stage {
   position: relative; background: #2b2723; border-radius: var(--radius);
-  overflow: hidden; aspect-ratio: 3 / 4; max-height: 62vh;
+  overflow: hidden; aspect-ratio: 3 / 4; max-height: 50vh;
   display: flex; align-items: center; justify-content: center;
 }
 .scan-stage video, .scan-stage img { width: 100%; height: 100%; object-fit: cover; }
@@ -474,6 +474,9 @@ main {
   border: 2px solid var(--line-strong); border-top-color: var(--wine);
   animation: spin 0.7s linear infinite; display: inline-block;
 }
+/* Larger, thicker spinner used while the AI model is reading the label, so the
+   "busy" state is clearly visible. */
+.spinner-lg { width: 28px; height: 28px; border-width: 3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-row { display: flex; align-items: center; gap: 0.5rem; color: var(--ink-soft); padding: 1rem 0; }
 

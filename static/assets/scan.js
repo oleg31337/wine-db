@@ -251,7 +251,7 @@
     panel.classList.remove("hidden");
     W.clear(panel).appendChild(
       el("div", { class: "card" }, [
-        W.loadingRow("Reading the label with the AI model…"),
+        W.loadingRow("Reading the label with the AI model…", true),
         el("div", { class: "pill-row", style: "margin-top:0.6rem" }, [
           el("button", {
             type: "button",
