@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     # Defaults to vision_model when empty.
     text_model: str | None = None
 
+    # Optional OpenAI-compat reasoning-effort knob. Some providers (notably
+    # Google's Gemini OpenAI endpoint) make the model "think" on every call by
+    # default, which turns a 1-2s label read into a 15-25s one. Setting
+    # AI_REASONING_EFFORT=none disables that thinking and keeps the scan fast;
+    # accepted values are "none"|"low"|"medium"|"high". Sent only when set,
+    # so providers that don't know the field are unaffected.
+    ai_reasoning_effort: str | None = None
+
     summary_base_url: str | None = None
     summary_api_key: str | None = None
     # Summarises raw internet search results into structured fields. The

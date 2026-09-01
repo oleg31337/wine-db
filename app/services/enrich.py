@@ -15,6 +15,7 @@ Hard rules:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -345,16 +346,21 @@ class AIClient:
 
     @staticmethod
     def _openai_url(base_url: str) -> str:
-        """Normalise any OpenAI-compatible base to .../v1/chat/completions.
+        """Normalise any OpenAI-compatible base to a chat/completions URL.
 
         Accepts a bare Ollama host (http://host:11434), a /v1 root
-        (https://api.openai.com/v1) or a full /v1/chat/completions URL.
+        (https://api.openai.com/v1), a full /v1/chat/completions URL, or
+        Google's OpenAI-compat root
+        (https://generativelanguage.googleapis.com/v1beta/openai) which serves
+        chat completions directly at .../chat/completions (no /v1 segment).
         """
         u = base_url.rstrip("/")
         if u.endswith("/chat/completions"):
             return u
         if u.endswith("/v1"):
             u = u[: -len("/v1")].rstrip("/")
+        if "generativelanguage.googleapis.com" in u or u.endswith("/v1beta/openai"):
+            return u + "/chat/completions"
         return u + "/v1/chat/completions"
 
     def _client(self) -> httpx.AsyncClient:
@@ -385,7 +391,18 @@ class AIClient:
             "temperature": 0,
             "stream": False,
         }
+        self._maybe_reasoning(payload)
         return _extract_json(await self._openai_chat(payload, s.vision_base_url, s.vision_api_key))
+
+    def _maybe_reasoning(self, payload: dict) -> None:
+        """Attach the OpenAI-compat reasoning-effort knob when configured.
+
+        Gemini's OpenAI endpoint thinks by default; AI_REASONING_EFFORT=none
+        turns that off so label reads stay fast. Sent only when set so other
+        providers (DeepSeek, Ollama, ...) never see an unknown field.
+        """
+        if self.settings.ai_reasoning_effort:
+            payload["reasoning_effort"] = self.settings.ai_reasoning_effort
 
     async def text_lookup(self, context: str) -> dict:
         s = self.settings
@@ -399,6 +416,7 @@ class AIClient:
             "temperature": 0.1,
             "stream": False,
         }
+        self._maybe_reasoning(payload)
         return _extract_json(await self._openai_chat(payload, s.vision_base_url, s.vision_api_key))
 
     async def _openai_chat(self, payload: dict, base_url: str, api_key: str | None) -> str:
@@ -406,14 +424,37 @@ class AIClient:
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        async with self._client() as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-        choices = data.get("choices") or []
-        if not choices:
-            return ""
-        return (choices[0].get("message") or {}).get("content", "") or ""
+        # Retry transient provider overload (503 "high demand", 429 rate limit)
+        # with backoff. Gemini's flash alias is frequently spikey; without this
+        # a demand spike kills a scan instead of retrying a second or two later.
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with self._client() as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    if resp.status_code in (429, 503):
+                        last_exc = httpx.HTTPStatusError(
+                            f"provider overloaded ({resp.status_code})",
+                            request=resp.request,
+                            response=resp,
+                        )
+                        if attempt < 2:
+                            await asyncio.sleep(0.8 * (attempt + 1))
+                            continue
+                    resp.raise_for_status()
+                    data = resp.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    return ""
+                return (choices[0].get("message") or {}).get("content", "") or ""
+            except (httpx.HTTPError, ValueError) as exc:
+                last_exc = exc
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (429, 503):
+                    if attempt < 2:
+                        await asyncio.sleep(0.8 * (attempt + 1))
+                        continue
+                raise
+        raise EnrichmentError(f"provider overloaded after retries: {last_exc}")
 
 
 async def _duckduckgo_search(settings: Settings, query: str) -> tuple[str, list[str]]:
@@ -624,6 +665,7 @@ async def summarize_search(client: "AIClient", context: str) -> dict:
             "temperature": 0.1,
             "stream": False,
         }
+        client._maybe_reasoning(payload)
         return _extract_json(await client._openai_chat(payload, s.summary_base_url, s.summary_api_key))
     if s.vision_base_url:
         payload = {
@@ -632,5 +674,6 @@ async def summarize_search(client: "AIClient", context: str) -> dict:
             "temperature": 0.1,
             "stream": False,
         }
+        client._maybe_reasoning(payload)
         return _extract_json(await client._openai_chat(payload, s.vision_base_url, s.vision_api_key))
     raise EnrichmentError("No AI endpoint configured")

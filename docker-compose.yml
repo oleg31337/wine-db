@@ -84,6 +84,7 @@ services:
       SUMMARY_MODEL: ${SUMMARY_MODEL:-nemotron-3-nano:4b}
       SUMMARY_BASE_URL: ${SUMMARY_BASE_URL:-}
       SUMMARY_API_KEY: ${SUMMARY_API_KEY:-}
+      AI_REASONING_EFFORT: ${AI_REASONING_EFFORT:-}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
 
       # --- Internet lookup

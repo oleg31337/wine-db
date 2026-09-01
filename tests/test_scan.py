@@ -384,6 +384,36 @@ def test_catalogue_sites_are_searched_alongside_general_web(api, user, fake_ai, 
     assert body["suggestion"]["body"] == 3
 
 
+def test_web_searches_run_concurrently(api, user, fake_ai, monkeypatch):
+    """The primary search and the site-scoped catalogue searches must overlap in
+    time (one asyncio.gather), not run one-after-another - that serialisation
+    added a full extra round-trip of latency to every scan."""
+    import app.routers.scan as scan_router
+
+    active = 0
+    max_active = 0
+    started = []
+
+    async def slow_search(settings, query):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        started.append(query)
+        import asyncio
+
+        await asyncio.sleep(0.05)
+        active -= 1
+        return "", []
+
+    monkeypatch.setattr(scan_router, "search_web", slow_search)
+    monkeypatch.setattr(scan_router, "summarize_search", lambda self, ctx: {})
+    monkeypatch.setattr(enrich_module, "summarize_search", lambda self, ctx: {})
+    api.post("/api/scan/lookup", json={"name": "Concurrent Test"})
+    # All four queries (general + 3 catalogue sites) must be in flight at once.
+    assert len(started) == 4, started
+    assert max_active >= 2, f"searches were serialised (max concurrency {max_active})"
+
+
 def test_summariser_declining_web_falls_back_without_overwriting(api, user, fake_ai, monkeypatch):
     """If the summariser finds no wine in the results, we don't invent one."""
     import app.routers.scan as scan_router
@@ -665,7 +695,11 @@ def test_summary_falls_back_to_vision_provider(monkeypatch):
 
 
 def test_openai_url_normalisation():
-    """A bare host, a /v1 root, or a full URL all map to /v1/chat/completions."""
+    """A bare host, a /v1 root, or a full URL all map to /v1/chat/completions.
+
+    Google's OpenAI-compat root (generativelanguage.googleapis.com/v1beta/openai)
+    is the exception: it serves chat completions WITHOUT a /v1 segment.
+    """
     assert enrich_module.AIClient._openai_url("https://api.deepseek.com") == (
         "https://api.deepseek.com/v1/chat/completions"
     )
@@ -678,6 +712,112 @@ def test_openai_url_normalisation():
     assert enrich_module.AIClient._openai_url("http://192.168.1.222:11434") == (
         "http://192.168.1.222:11434/v1/chat/completions"
     )
+    # Google's OpenAI-compat endpoint (no /v1 segment in the path).
+    assert enrich_module.AIClient._openai_url(
+        "https://generativelanguage.googleapis.com/v1beta/openai/"
+    ) == (
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    )
+
+
+def test_reasoning_effort_attached_only_when_configured(monkeypatch):
+    """AI_REASONING_EFFORT is sent to the model payload only when set, so
+    providers that don't know the field (DeepSeek, Ollama) never see it."""
+    from app.config import Settings
+
+    captured = {}
+
+    async def fake_openai(self, payload, base_url, api_key):
+        captured["payload"] = payload
+        return '{"name": "ok"}'
+
+    monkeypatch.setattr(enrich_module.AIClient, "_openai_chat", fake_openai, raising=False)
+    import asyncio
+
+    # Configured -> sent on vision, text lookup AND summary payloads.
+    settings = Settings(
+        vision_base_url="https://gemini.example/v1beta/openai",
+        vision_api_key="k",
+        vision_model="gemini-flash-latest",
+        summary_base_url="https://gemini.example/v1beta/openai",
+        summary_api_key="k",
+        summary_model="gemini-flash-latest",
+        ai_reasoning_effort="none",
+    )
+    client = enrich_module.AIClient(settings)
+
+    async def run_configured():
+        await client.vision_label(b"img")
+        assert captured["payload"].get("reasoning_effort") == "none"
+        await client.text_lookup("ctx")
+        assert captured["payload"].get("reasoning_effort") == "none"
+        await enrich_module.summarize_search(client, "ctx")
+        assert captured["payload"].get("reasoning_effort") == "none"
+
+    asyncio.run(run_configured())
+
+    # Unset -> absent (provider default). Explicit None so the repo .env
+    # (which sets AI_REASONING_EFFORT=none in live deploys) cannot leak in.
+    settings2 = Settings(
+        vision_base_url="https://vision.example/v1",
+        vision_api_key="k",
+        vision_model="vl-model",
+        ai_reasoning_effort=None,
+    )
+    client2 = enrich_module.AIClient(settings2)
+
+    async def run_unset():
+        await client2.vision_label(b"img")
+        assert "reasoning_effort" not in captured["payload"]
+
+    asyncio.run(run_unset())
+
+
+def test_provider_503_is_retried_with_backoff(monkeypatch):
+    """Transient 503 'high demand' responses must be retried (Gemini's flash
+    alias is spikey); a persistent overload still surfaces as an error."""
+    from app.config import Settings
+
+    import httpx
+
+    calls = {"n": 0}
+
+    class _FakeResp:
+        status_code = 503
+        request = httpx.Request("POST", "http://x")
+
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("503", request=self.request, response=self)
+
+        def json(self):
+            return {}
+
+    async def fake_post(self, url, json=None, headers=None):
+        calls["n"] += 1
+        return _FakeResp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    settings = Settings(
+        vision_base_url="https://vision.example/v1",
+        vision_api_key="k",
+        vision_model="vl-model",
+        ai_reasoning_effort=None,
+    )
+    client = enrich_module.AIClient(settings)
+    import asyncio
+
+    async def run():
+        # After 3 attempts (2 retries + final failure) it must raise the
+        # underlying HTTPStatusError (the router maps that to a user message).
+        try:
+            await client.vision_label(b"img")
+            raise AssertionError("expected an error after retries")
+        except httpx.HTTPStatusError:
+            pass
+        assert calls["n"] == 3, calls
+
+    asyncio.run(run())
 
 
 # --------------------------------------------------------------- duplicate check

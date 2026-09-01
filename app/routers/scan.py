@@ -265,21 +265,23 @@ async def _enrich_from_context(
         "wine",
     ]
     query = " ".join(b for b in query_bits if b).strip()
-    web_context, web_sources = await search_web(settings, query) if query else ("", [])
 
-    # Large wine catalogues are queried with site-scoped searches, all fanned out
-    # in parallel via asyncio.gather so they run simultaneously. CellarTracker,
-    # Vivino and SAQ are large wine databases; their product pages are considered
-    # when the engine supports site-scoping. No Wikipedia fallback applies to these
-    # (a bare "site:..." would pollute the fallback) and none has a public API, so
-    # each simply contributes nothing when the primary engine is unavailable.
-    # The list of sites lives in _WEB_SOURCES.
+    # All web lookups — the primary search plus one site-scoped search per
+    # catalogue in _WEB_SOURCES — run in ONE asyncio.gather so they finish in
+    # parallel. (Previously the primary search ran first, then the site
+    # searches, adding a full extra round-trip of latency to every scan.)
     if query:
-        site_tasks = [search_web(settings, f"{query} site:{site}") for site in _WEB_SOURCES]
-        for ctx, src in await asyncio.gather(*site_tasks):
+        tasks = [search_web(settings, query)] + [
+            search_web(settings, f"{query} site:{site}") for site in _WEB_SOURCES
+        ]
+        results = await asyncio.gather(*tasks)
+        web_context, web_sources = results[0]
+        for ctx, src in results[1:]:
             if ctx:
                 web_context = (web_context + "\n" + ctx).strip()
                 web_sources = web_sources + src
+    else:
+        web_context, web_sources = "", []
     if web_context:
         sources.extend(web_sources)
         confidence = "medium"
