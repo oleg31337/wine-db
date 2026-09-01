@@ -65,7 +65,7 @@ def init_db() -> None:
     )
     # Drop columns removed after first deploy without a full migration tool.
     # create_all() won't touch existing tables, so prune here. Idempotent.
-    _drop_columns(engine, "wines", {"barcode"})
+    _drop_columns(engine, "wines", {"barcode", "notes_source"})
 
 
 def _ensure_columns(engine: Engine, table: str, columns: dict[str, str]) -> None:

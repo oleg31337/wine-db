@@ -7,7 +7,6 @@
   var stream = null;
   var facing = "environment";
   var capturedBlob = null;
-  var manualMode = false;
   var isBackLabel = false;
   var refreshHook = null;
   // The open "New wine card" modal (if any). The illegible-label "↺ Retake
@@ -25,16 +24,6 @@
 
   function $(id) {
     return W.$(id);
-  }
-
-  function hint(text) {
-    var node = $("#scan-hint");
-    if (!text) {
-      node.classList.add("hidden");
-      return;
-    }
-    node.classList.remove("hidden");
-    node.textContent = text;
   }
 
   // Phone camera photos are often several MB; the reverse proxy in front of
@@ -60,7 +49,6 @@
     $("#scan-icon-actions").classList.add("hidden");
     $("#btn-cam-start").classList.remove("hidden");
     $("#scan-idle").classList.remove("hidden");
-    hint("");
   }
 
   /* After a photo is taken (camera or file) the camera controls must not
@@ -94,7 +82,6 @@
     preview.removeAttribute("src");
     $("#suggest-panel").classList.add("hidden");
     $("#suggest-panel").innerHTML = "";
-    hint("");
     if (lastCaptureSource === "camera" && cameraSupported()) {
       startCamera();
     } else if (lastCaptureSource === "file") {
@@ -657,7 +644,6 @@
     isBackLabel = false;
     currentForm = null;
     pendingBackText = "";
-    manualMode = false;
     lastCaptureSource = null;
     $("#scan-preview").classList.add("hidden");
     $("#suggest-panel").classList.add("hidden");
@@ -726,7 +712,6 @@
     W.startCamera = startCamera;
     W.manualAdd = function () {
       reset();
-      manualMode = true;
       openCardWithSuggestion({ suggestion: {}, messages: [], sources: [] }, true);
     };
   };

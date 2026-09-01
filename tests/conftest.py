@@ -23,7 +23,6 @@ ENV = {
     "SECRET_KEY": "test-secret-key-that-is-long-enough-1234567890",
     "COOKIE_SECURE": "false",
     "WEB_SEARCH_ENABLED": "false",
-    "ALLOW_OPEN_REGISTRATION": "true",
     "ADMIN_USERNAME": "admin",
     "ADMIN_PASSWORD_HASH": "$argon2id$v=19$m=65536,t=3,p=2$3gxbO/mGFtaJxhh4FNwsJg$YfadqH4wo0PmN5YhOQSC3csbtBkz0uiYIGlOJ4C0pFk",
     "RATE_LIMIT_API_PER_MINUTE": "100000",

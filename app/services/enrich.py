@@ -555,9 +555,15 @@ async def search_web(
     if not (settings.web_search_enabled and query.strip()):
         return "", []
 
-    if settings.searxng_base_url:
+    provider = (settings.web_search_provider or "duckduckgo").strip().lower()
+    # The configured provider wins; searxng also requires a base URL to be set.
+    # If someone sets WEB_SEARCH_PROVIDER=searxng without SEARXNG_BASE_URL, fall
+    # back to DuckDuckGo rather than failing the scan.
+    if provider == "searxng" and settings.searxng_base_url:
         primary_ctx, primary_src = await _searxng_search(settings, query)
     else:
+        if provider == "searxng":
+            logger.info("WEB_SEARCH_PROVIDER=searxng but SEARXNG_BASE_URL is empty; using DuckDuckGo")
         primary_ctx, primary_src = await _duckduckgo_search(settings, query)
 
     # DuckDuckGo returns a 202 anti-bot page with no anchors -> empty context.

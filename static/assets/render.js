@@ -5,7 +5,7 @@
   var el = W.el;
 
   /* Read-only star display. */
-  W.stars = function (value, big) {
+  W.stars = function (value) {
     var v = Math.round(Number(value) || 0);
     var kids = [];
     for (var i = 1; i <= 5; i++) {
@@ -13,7 +13,7 @@
     }
     return el(
       "span",
-      { class: "stars" + (big ? " stars-lg" : ""), role: "img", "aria-label": v ? v + " out of 5 stars" : "not rated" },
+      { class: "stars", role: "img", "aria-label": v ? v + " out of 5 stars" : "not rated" },
       kids
     );
   };

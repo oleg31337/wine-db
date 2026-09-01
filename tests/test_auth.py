@@ -273,9 +273,8 @@ def test_login_throttle_locks_after_repeated_failures(api, user):
 def test_production_refuses_to_boot_without_admin_hash():
     from app.config import Settings
     from app.db import Base
-    from app.models import User
     from app.security import bootstrap_admin
-    from sqlalchemy import create_engine, select
+    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     s = Settings(

@@ -11,14 +11,13 @@ Security posture (TLS itself is terminated by the reverse proxy):
 from __future__ import annotations
 
 import logging
-import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -168,7 +167,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     rate_rules = [
         Rule(
             limit=settings.rate_limit_login_per_minute,
-            prefixes=("/api/auth/login", "/api/auth/register", "/api/auth/password"),
+            prefixes=("/api/auth/login", "/api/auth/password"),
             methods=("POST",),
             name="auth",
         ),

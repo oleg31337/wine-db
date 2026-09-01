@@ -6,7 +6,7 @@ import io
 import json
 import zipfile
 
-from tests.conftest import create_wine, login, make_image
+from tests.conftest import create_wine, make_image
 
 
 def export_zip(api):

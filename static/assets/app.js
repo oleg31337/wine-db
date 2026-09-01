@@ -457,17 +457,28 @@
   /* ---------------- data / account (admin) ---------------- */
   function loadUsers() {
     var host = $("#user-list");
+    var shared = $("#user-list-shared");
     W.clear(host);
+    if (shared) W.clear(shared);
     host.appendChild(el("p", { class: "muted", text: "Loading…" }));
+    if (shared) shared.appendChild(el("p", { class: "muted", text: "Loading…" }));
     W.api
       .get("/api/auth/users")
       .then(function (users) {
         W.clear(host);
+        if (shared) W.clear(shared);
         if (!users.length) {
           host.appendChild(el("p", { class: "muted", text: "No other accounts yet." }));
+          if (shared) shared.appendChild(el("p", { class: "muted", text: "No other accounts yet." }));
           return;
         }
         users.forEach(function (u) {
+          var who = el("span", { class: "user-name", text: u.username });
+          var whoSub = el("span", { class: "muted", text: u.display_name ? " (" + u.display_name + ")" : "" });
+          if (u.is_admin) whoSub.appendChild(el("span", { class: "badge badge-admin", text: "admin" }));
+          // The read-only "Who shares this database" card gets the same roster
+          // (name + display name + admin badge), without the admin actions.
+          if (shared) shared.appendChild(el("div", { class: "user-row" }, [el("div", {}, [who, whoSub])]));
           var row = el("div", { class: "user-row" }, [
             el("div", {}, [
               el("span", { class: "user-name", text: u.username }),
@@ -496,7 +507,7 @@
           host.appendChild(row);
         });
       })
-      .catch(function () { W.clear(host); });
+      .catch(function () { W.clear(host); if (shared) W.clear(shared); });
   }
 
   function removeUser(user) {

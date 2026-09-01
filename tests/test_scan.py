@@ -470,7 +470,6 @@ def test_wikipedia_fallback_fills_context_when_primary_empty(monkeypatch):
     """When the primary engine (DuckDuckGo) yields nothing, search_web falls
     back to Wikipedia and returns real encyclopedic context + a source."""
     import asyncio
-    import httpx
 
     # Simulate DuckDuckGo returning an empty anti-bot page.
     async def fake_ddg(settings, query):

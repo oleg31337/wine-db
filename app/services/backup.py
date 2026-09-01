@@ -299,7 +299,10 @@ def import_backup(db: Session, uploads_dir: str, raw: bytes, replace: bool = Tru
         return id_map.get(str(ref))
 
     def _gauge(value) -> int | None:
-        return value if isinstance(value, int) and 0 <= value <= 5 else None
+        # Gauges are 0-3 (0 = "no such taste"); the DB CheckConstraint enforces
+        # the same range, so a backup carrying an out-of-range value is dropped
+        # rather than failing the whole restore with an IntegrityError.
+        return value if isinstance(value, int) and 0 <= value <= 3 else None
 
     # --- wines ---
     def _wine_key(name: str, row: dict) -> tuple:

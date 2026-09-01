@@ -90,7 +90,6 @@ class Wine(Base):
     wood: Mapped[int | None] = mapped_column(Integer)
 
     photo_path: Mapped[str | None] = mapped_column(String(255))
-    notes_source: Mapped[str | None] = mapped_column(String(255))
     # Raw text the vision model read from the BACK label when the wine was
     # added. Optional provenance - the structured facts it contained (grape,
     # region, country, alcohol, sugar) are merged into the fields above.

@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models import WineType
 
 COMMENT_MAX = 4000
-COMMENT_MIN_ALLOWED = 1000  # requirement: at least 1000 characters must be accepted
 
 
 def _reject_control_chars(v: str) -> str:
@@ -42,14 +41,6 @@ class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=1, max_length=128)
-
-
-class RegisterRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    username: str = Field(min_length=3, max_length=32)
-    password: str = Field(min_length=12, max_length=128)
-    display_name: str | None = Field(default=None, max_length=64)
-    registration_code: str | None = Field(default=None, max_length=128)
 
 
 class PasswordChangeRequest(BaseModel):

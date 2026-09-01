@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.conftest import GOOD_PASSWORD, create_wine, register
+from tests.conftest import GOOD_PASSWORD, create_wine
 
 
 # --------------------------------------------------------------- headers

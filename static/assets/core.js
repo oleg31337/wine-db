@@ -271,10 +271,6 @@
     typeLabel: function (t) {
       return { red: "Red", white: "White", rose: "Rosé", sparkling: "Sparkling", other: "Other" }[t] || "Other";
     },
-    num: function (v, suffix) {
-      if (v === null || v === undefined || v === "") return "";
-      return String(v) + (suffix || "");
-    },
   };
 
   W.debounce = function (fn, ms) {

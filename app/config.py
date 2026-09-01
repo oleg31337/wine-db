@@ -16,9 +16,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # --- Core ---
-    app_name: str = "wine-db"
     environment: str = Field(default="production")
-    web_port: int = 8080
     # Deploy version stamped onto static asset URLs (?v=) so every rebuild forces
     # the browser to fetch fresh JS instead of running a stale cached copy. Falls
     # back to a process-start timestamp when unset (still unique per deploy).
@@ -40,10 +38,7 @@ class Settings(BaseSettings):
 
     # --- Registration ---
     # Public self-registration is disabled by design: only an admin (seeded from
-    # the environment below) may create accounts. These switches remain for
-    # advanced self-hosting scenarios but default to closed.
-    allow_open_registration: bool = False
-    registration_code: str | None = None
+    # the environment below) may create accounts. There is no register route.
 
     # --- Admin bootstrap ---
     # The single admin account is provisioned from the environment, never via a

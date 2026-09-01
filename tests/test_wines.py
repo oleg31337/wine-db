@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.conftest import create_wine, login, make_image, wine_payload
+from tests.conftest import create_wine, login, wine_payload
 
 
 # --------------------------------------------------------------- auth wall

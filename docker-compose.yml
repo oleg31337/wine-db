@@ -64,9 +64,6 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-*}
 
-      ALLOW_OPEN_REGISTRATION: ${ALLOW_OPEN_REGISTRATION:-false}
-      REGISTRATION_CODE: ${REGISTRATION_CODE:-}
-
       # --- Administrator (the only account that can manage users / backups)
       # Generate the hash with:  python -m app.tools.admin_hash "<password>"
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}

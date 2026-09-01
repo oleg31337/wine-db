@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import User
-from app.security import current_user, require_admin, require_csrf
+from app.security import require_admin, require_csrf
 from app.services.backup import export_backup, import_backup
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])

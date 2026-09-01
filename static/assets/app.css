@@ -280,7 +280,6 @@ main {
 .stars { display: inline-flex; gap: 0.08rem; align-items: center; }
 .stars .s { color: var(--line-strong); font-size: 1rem; line-height: 1; }
 .stars .s.on { color: var(--gold); }
-.stars-lg .s { font-size: 1.7rem; }
 .star-input { display: inline-flex; gap: 0.15rem; }
 .star-input button {
   border: none; background: none; padding: 0.1rem; min-height: 40px;
@@ -371,11 +370,6 @@ main {
   position: absolute; inset: 12% 8%; border: 2px solid rgba(253, 248, 244, 0.75);
   border-radius: var(--radius); pointer-events: none;
   box-shadow: 0 0 0 9999px rgba(29, 25, 22, 0.28);
-}
-.scan-hint {
-  position: absolute; bottom: 0.6rem; left: 0.6rem; right: 0.6rem;
-  color: #fdf8f4; font-size: 0.82rem; text-align: center;
-  background: rgba(29, 25, 22, 0.6); border-radius: var(--radius-sm); padding: 0.35rem 0.5rem;
 }
 .scan-actions { display: grid; gap: 0.5rem; grid-template-columns: 1fr 1fr; margin-top: 0.75rem; }
 .scan-actions .full { grid-column: 1 / -1; }
