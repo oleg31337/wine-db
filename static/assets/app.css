@@ -390,6 +390,12 @@ main {
 }
 
 .suggest-box { border: 1px solid var(--gold); background: #fbf6ec; border-radius: var(--radius); padding: 0.8rem; }
+/* scrollIntoView target after a capture; clear the sticky header (and the
+   desktop tabbar directly under it) so the AI summary isn't hidden behind it. */
+#suggest-panel { scroll-margin-top: calc(var(--header-h) + 0.75rem); }
+@media (min-width: 900px) {
+  #suggest-panel { scroll-margin-top: calc(var(--header-h) + var(--tabbar-h) + 0.75rem); }
+}
 .suggest-list { display: grid; gap: 0.4rem; margin: 0.5rem 0; }
 .suggest-item { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.88rem; }
 .suggest-item input { width: auto; min-height: auto; margin-top: 0.25rem; }

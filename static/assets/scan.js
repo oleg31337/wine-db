@@ -10,6 +10,10 @@
   var manualMode = false;
   var isBackLabel = false;
   var refreshHook = null;
+  // The open "New wine card" modal (if any). The illegible-label "↺ Retake
+  // photo" button lives INSIDE it, so retake() must close the modal first or
+  // the camera restarts behind the backdrop and nothing appears to happen.
+  var currentModal = null;
   // Which picker produced the current photo, so "Retake" can reopen the same one.
   var lastCaptureSource = null; // "camera" | "file"
   // The in-progress new-wine form. Kept at module scope so a back-label scan
@@ -59,9 +63,30 @@
     hint("");
   }
 
+  /* After a photo is taken (camera or file) the camera controls must not
+     come back: the capture/stop/flip icons AND the "Start camera" + idle
+     rows are all hidden so the stage reads as "photo taken", not
+     "camera ready". startCamera() re-shows them when the user returns. */
+  function hideCameraControls() {
+    $("#scan-video").classList.add("hidden");
+    $("#scan-reticle").classList.add("hidden");
+    $("#scan-idle").classList.add("hidden");
+    $("#btn-capture").classList.add("hidden");
+    $("#btn-cam-stop").classList.add("hidden");
+    $("#btn-cam-flip").classList.add("hidden");
+    $("#scan-icon-actions").classList.add("hidden");
+    $("#btn-cam-start").classList.add("hidden");
+  }
+
   /* Undo the current capture and reopen the same picker, so the user can have
-     another go at the photo instead of being stuck with a bad frame. */
+     another go at the photo instead of being stuck with a bad frame. If the
+     new-wine modal is open (illegible-label retake), close it first so the
+     camera interface is visible again. */
   function retake() {
+    if (currentModal) {
+      currentModal.close();
+      currentModal = null;
+    }
     capturedBlob = null;
     var preview = $("#scan-preview");
     if (preview.src && preview.src.indexOf("blob:") === 0) URL.revokeObjectURL(preview.src);
@@ -248,6 +273,10 @@
     // overwrite the captured photo.
     if (!isBackLabel) capturedBlob = blob;
     showPreview(blob);
+    // A photo is now in hand: the camera controls (capture/stop/flip AND
+    // "Start camera"/idle) must not come back, and the view scrolls down to
+    // the AI summary so the user sees the reading progress + result.
+    hideCameraControls();
     var panel = $("#suggest-panel");
     panel.classList.remove("hidden");
     W.clear(panel).appendChild(
@@ -263,6 +292,7 @@
         ]),
       ])
     );
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
 
     // Shrink the image in-browser so it clears the reverse proxy's
     // request-body limit (and uploads quickly). The original may be several MB.
@@ -341,7 +371,8 @@
         onclick: function () {
           // Close this scan/modal, land on the Browse page, then open the real
           // wine card there (don't keep editing the new-wine form).
-          W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
+          if (currentModal) { currentModal.close(); currentModal = null; }
+          else W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
           if (W.switchView) W.switchView("browse");
           if (W.openWine) W.openWine(w.id, W.me, function () { if (refreshHook) refreshHook(); });
           else W.toast("Could not open that wine", "err");
@@ -486,7 +517,8 @@
   function startBackLabelScan(form) {
     currentForm = form;
     isBackLabel = true;
-    W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
+    if (currentModal) { currentModal.close(); currentModal = null; }
+    else W.$$(".modal-backdrop").forEach(function (m) { m.remove(); });
     W.switchView("scan");
     W.toast("Point the camera at the BACK label", "ok");
   }
@@ -575,7 +607,9 @@
         el("button", { type: "button", text: "Cancel", onclick: function () { m.close(); } }),
         save,
       ],
+      onClose: function () { currentModal = null; },
     });
+    currentModal = m;
     if (applied.length) W.toast("Filled " + applied.length + " empty field(s)", "ok");
     if (!form.inputs.name.value) form.focusName();
   }
@@ -663,6 +697,14 @@
       });
     });
 
+    // "Choose a photo instead" must release the camera stream (green light
+    // off) as soon as it is pressed, not keep it running behind the picker.
+    // If the user cancels the picker they get the idle "Start camera" state;
+    // if they pick a file, analyze() hides the controls and scrolls to the AI
+    // summary.
+    var choosePhoto = W.$("#btn-choose-photo");
+    if (choosePhoto) choosePhoto.addEventListener("click", stopCamera);
+
     $("#file-input").addEventListener("change", function (ev) {
       var file = ev.target.files && ev.target.files[0];
       if (!file) return;
@@ -670,6 +712,7 @@
         W.toast("That image is too large (max ~8 MB after processing).", "err");
         return;
       }
+      stopCamera(); // safety net if the picker was opened without the label click
       lastCaptureSource = "file";
       analyze(file, false, "file");
       ev.target.value = "";
