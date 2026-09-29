@@ -84,9 +84,18 @@
             password: $("#login-password").value,
           },
         })
-        .then(function (user) {
-          $("#login-password").value = "";
-          showApp(user);
+        .then(function () {
+          // Hand the browser a real navigation so its password manager offers to
+          // save the credentials. Chromium and WebKit decide from a *document
+          // navigation* that follows a submitted password form; the previous
+          // in-place screen swap (showApp) gave them no such signal at all, which
+          // is why no save prompt ever appeared (notably on iOS).
+          // Deliberately NOT cleared here: the field must still hold its value
+          // while the document unloads so the browser can snapshot it - emptying
+          // it first suppressed the prompt. It is destroyed by the navigation.
+          // No query string, so nothing about the login reaches the URL or the
+          // proxy access log. boot() re-establishes the session via /api/auth/me.
+          window.location.replace("/");
         })
         .catch(function (err) {
           $("#auth-error").textContent = err.message;

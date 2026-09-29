@@ -20,7 +20,15 @@
       <span class="brand-text">wine-db<br /><small>private tasting notes</small></span>
     </div>
 
-    <form id="login-form" autocomplete="on" novalidate>
+    <!-- method/action matter even though JS intercepts the submit: without them
+         the HTML default is GET to the current URL, so if the submit handler is
+         not attached yet (or JS is blocked) the browser would put the password in
+         the query string - i.e. into browser history and the reverse-proxy access
+         log. POSTing to the JSON login endpoint instead makes that fallback fail
+         inertly (422) with the credentials staying in the request body.
+         An explicit method/action is also part of how password managers
+         classify a form as a login. -->
+    <form id="login-form" method="post" action="/api/auth/login" autocomplete="on" novalidate>
       <div class="field">
         <label for="login-username">Username</label>
         <input id="login-username" name="username" autocomplete="username"
