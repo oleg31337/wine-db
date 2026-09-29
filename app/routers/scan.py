@@ -460,7 +460,7 @@ async def scan_lookup(
     """Typed-name or label-text lookup, no photo needed."""
     if not any([payload.name, payload.maker, payload.label_text]):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Provide a name or label text",
         )
 

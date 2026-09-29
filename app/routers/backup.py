@@ -45,7 +45,7 @@ async def import_zip(
 ) -> dict:
     if mode not in ("replace", "merge"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="mode must be replace or merge"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="mode must be replace or merge"
         )
 
     chunks: list[bytes] = []

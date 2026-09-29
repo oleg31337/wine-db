@@ -57,7 +57,7 @@ def validate_username(username: str) -> str:
     username = (username or "").strip()
     if not USERNAME_RE.fullmatch(username):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Username must be 3-32 chars: letters, digits, dot, dash, underscore.",
         )
     return username
@@ -66,7 +66,7 @@ def validate_username(username: str) -> str:
 def validate_password(password: str) -> str:
     if not (MIN_PASSWORD_LEN <= len(password or "") <= MAX_PASSWORD_LEN):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Password must be {MIN_PASSWORD_LEN}-{MAX_PASSWORD_LEN} characters.",
         )
     classes = sum(
@@ -74,7 +74,7 @@ def validate_password(password: str) -> str:
     )
     if classes < 3:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Password needs at least 3 of: lowercase, uppercase, digit, symbol.",
         )
     return password
