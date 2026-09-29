@@ -15,7 +15,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -218,9 +218,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             import re
 
             html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+            # Stamp both src= (scripts) and href= (stylesheets, icons) so a
+            # deploy invalidates every asset URL the document references.
             html = re.sub(
-                r'src="/assets/([^"]+)"',
-                lambda m: 'src="/assets/' + m.group(1) + '?v=' + asset_version + '"',
+                r'(src|href)="/assets/([^"?]+)"',
+                lambda m: f'{m.group(1)}="/assets/{m.group(2)}?v=' + asset_version + '"',
                 html,
             )
             import tempfile
@@ -233,6 +235,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         @app.get("/manifest.webmanifest", include_in_schema=False)
         async def manifest() -> FileResponse:
             return FileResponse(STATIC_DIR / "manifest.webmanifest")
+
+        @app.get("/favicon.ico", include_in_schema=False)
+        async def favicon() -> FileResponse:
+            # Browsers request /favicon.ico by default (and again after any 404),
+            # independently of the <link rel="icon"> tags in the HTML. Serving it
+            # here means that implicit request resolves instead of filling the
+            # access log with 404s.
+            icon = STATIC_DIR / "assets" / "favicon.ico"
+            if not icon.is_file():
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+            return FileResponse(icon)
 
     return app
 
