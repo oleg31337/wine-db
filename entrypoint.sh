@@ -18,6 +18,20 @@
 # Either way the app can write to /data/uploads, which is what matters.
 set -e
 
+# SECURITY: the only peers allowed to set X-Forwarded-For. This replaces the
+# previous "--forwarded-allow-ips *" that trusted the header from ANY source.
+# With "*" (or when the app parses the raw header), a client could claim a
+# fresh arbitrary IP per request and fully bypass rate limiting / the login
+# throttle. Restricting this to the reverse proxy means uvicorn rewrites
+# scope["client"] to the real client IP ONLY when the direct peer is that proxy.
+# Default is loopback, which covers an nginx running on the same host. If your
+# proxy runs in another container/host, set FORWARDED_ALLOW_IPS to its address.
+: "${FORWARDED_ALLOW_IPS:=127.0.0.1,::1}"
+
+APP_CMD="uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 1 \
+    --proxy-headers --forwarded-allow-ips \"$FORWARDED_ALLOW_IPS\" \
+    --no-server-header --log-level info"
+
 DATA_UID=$(id -u wine)
 
 # Only attempt chown when the directory isn't already owned by the app user.
@@ -30,11 +44,11 @@ if [ "$(stat -c '%u' /data 2>/dev/null)" != "$DATA_UID" ]; then
         # still write to /data (root write works on FAT masks and 755 root dirs).
         echo "wine-db: warning: cannot chown /data to the app user (filesystem does" \
              "not support changing ownership, e.g. exFAT/NTFS/CIFS or userns-remap);" \
-             "running the server as root so it can write to the bind mount."
-        exec "$@"
+             "running the server as root so it can write to the bind mount." >&2
+        exec sh -c "$APP_CMD"
     fi
 fi
 
 # Drop to the unprivileged user for the real server process. gosu forwards
 # signals (SIGTERM etc.) to the child so graceful shutdown still works.
-exec gosu wine "$@"
+exec gosu wine sh -c "$APP_CMD"

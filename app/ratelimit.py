@@ -47,11 +47,18 @@ class RateLimitMiddleware:
     # -- helpers ---------------------------------------------------------
     @staticmethod
     def _client_ip(scope: Scope) -> str:
-        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
-        # The reverse proxy is the only expected source of these.
-        forwarded = headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()[:64]
+        # Use scope["client"], the peer/real-client address as resolved by
+        # uvicorn's proxy-headers handling. We deliberately do NOT parse the raw
+        # X-Forwarded-For header here: a client can set it to anything, and
+        # taking the first comma-separated value would let an attacker claim a
+        # fresh arbitrary IP on every request, minting a new rate-limit bucket
+        # each time (i.e. fully bypassing rate limiting).
+        #
+        # scope["client"] is trustworthy because uvicorn only rewrites it from
+        # X-Forwarded-For when the direct peer is in --forwarded-allow-ips,
+        # which Docker restricts to the reverse proxy (see entrypoint.sh /
+        # FORWARDED_ALLOW_IPS). With the proxy fronting the traffic, this is the
+        # real client IP; otherwise it falls back to the socket peer.
         client = scope.get("client")
         return client[0] if client else "unknown"
 

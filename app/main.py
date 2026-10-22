@@ -15,7 +15,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -211,26 +211,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if STATIC_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
+        # Build the deploy-version-stamped HTML once at startup and serve it from
+        # memory. We deliberately do NOT write a temp file per request (as the
+        # old mkstemp path did): the container runs a read-only rootfs with a
+        # small /tmp tmpfs, and per-request files that are never deleted would
+        # slowly fill it — and let a traffic flood DoS the app. In-memory is both
+        # faster and leak-free.
+        import re as _re
+
+        _index_html = _re.sub(
+            r'(src|href)="/assets/([^"?]+)"',
+            lambda m: f'{m.group(1)}="/assets/{m.group(2)}?v=' + asset_version + '"',
+            (STATIC_DIR / "index.html").read_text(encoding="utf-8"),
+        ).encode("utf-8")
+
         @app.get("/", include_in_schema=False)
-        async def index() -> FileResponse:
-            # Stamp a deploy version onto every static asset URL so browsers fetch
-            # the new build instead of serving a cached script after a deploy.
-            import re
-
-            html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-            # Stamp both src= (scripts) and href= (stylesheets, icons) so a
-            # deploy invalidates every asset URL the document references.
-            html = re.sub(
-                r'(src|href)="/assets/([^"?]+)"',
-                lambda m: f'{m.group(1)}="/assets/{m.group(2)}?v=' + asset_version + '"',
-                html,
+        async def index() -> Response:
+            return Response(
+                content=_index_html,
+                media_type="text/html",
+                headers={"Cache-Control": "no-store"},
             )
-            import tempfile
-
-            fd, path = tempfile.mkstemp(suffix=".html")
-            with open(fd, "wb") as f:
-                f.write(html.encode("utf-8"))
-            return FileResponse(path, headers={"Cache-Control": "no-store"})
 
         @app.get("/manifest.webmanifest", include_in_schema=False)
         async def manifest() -> FileResponse:

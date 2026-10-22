@@ -62,7 +62,14 @@ services:
 
       SESSION_TTL_MINUTES: ${SESSION_TTL_MINUTES:-720}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Set to your real public hostname(s), comma separated (e.g. wine.example.com).
+      # "*" disables the Host check; acceptable but not ideal for an exposed instance.
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-*}
+      # SECURITY: only these peers may set X-Forwarded-For (uvicorn
+      # --forwarded-allow-ips). Loopback covers an nginx on the SAME host. If
+      # nginx runs in another container/host, set this to that address(es).
+      # Never "*" — it lets clients spoof their IP and bypass rate limiting.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1,::1}
 
       # --- Administrator (the only account that can manage users / backups)
       # Generate the hash with:  python -m app.tools.admin_hash "<password>"

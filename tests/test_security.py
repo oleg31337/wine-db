@@ -183,15 +183,31 @@ def test_rate_limit_resets_after_the_window(monkeypatch):
     assert mw._consume(("c", "test"), rule)[0] is True
 
 
-def test_proxy_forwarded_ip_is_used_as_the_client_key():
+def test_client_ip_ignores_spoofed_forwarded_for():
+    """A client-supplied X-Forwarded-For must NOT be trusted as the key.
+
+    The proxy resolves the real client into scope[\"client\"] (and uvicorn only
+    rewrites it from XFF when the peer is a trusted proxy). Reading the raw
+    header here would let an attacker claim a fresh arbitrary IP per request
+    and bypass rate limiting entirely.
+    """
     import app.ratelimit as rl
 
+    # Even with a spoofed XFF header claiming 203.0.113.7, the key must be the
+    # socket/real peer (10.0.0.1) — the spoofed value is ignored.
     scope = {
         "type": "http",
         "headers": [(b"x-forwarded-for", b"203.0.113.7, 10.0.0.1")],
         "client": ("10.0.0.1", 5000),
     }
-    assert rl.RateLimitMiddleware._client_ip(scope) == "203.0.113.7"
+    assert rl.RateLimitMiddleware._client_ip(scope) == "10.0.0.1"
+
+
+def test_client_ip_falls_back_when_no_client():
+    import app.ratelimit as rl
+
+    scope = {"type": "http", "headers": [(b"x-forwarded-for", b"203.0.113.7")]}
+    assert rl.RateLimitMiddleware._client_ip(scope) == "unknown"
 
 
 def test_stricter_rules_match_by_path_prefix():

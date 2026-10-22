@@ -29,7 +29,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
     DATA_DIR=/data \
-    APP_VERSION=${APP_VERSION}
+    APP_VERSION=${APP_VERSION} \
+    FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1,::1}
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpq5 curl gosu \
@@ -60,10 +61,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # wine-db is a household-scale app; scale the reverse proxy, not this.
 # Entrypoint fixes /data ownership (host bind mount starts root-owned) then
 # drops to the unprivileged 'wine' user via gosu for the server process.
+# The real server command (with the restricted --forwarded-allow-ips) is built
+# in entrypoint.sh from FORWARDED_ALLOW_IPS; the ENTRYPOINT overrides this CMD.
+# This CMD exists only as a clear default for anyone who replaces the entrypoint.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", "--port", "8080", \
      "--workers", "1", \
-     "--proxy-headers", "--forwarded-allow-ips", "*", \
+     "--proxy-headers", \
      "--no-server-header", \
      "--log-level", "info"]
