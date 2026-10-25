@@ -16,7 +16,7 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 
 def _create_engine(url: str) -> Engine:
-    kwargs: dict = {"pool_pre_ping": True, "future": True}
+    kwargs: dict = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     else:

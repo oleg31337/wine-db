@@ -10,7 +10,8 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    # Fully qualified so Podman hosts with short-name-mode=enforcing resolve it.
+    image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-winedb}
@@ -116,6 +117,16 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # entrypoint.sh starts as root, chowns /data to the app user, then drops to
+    # it via gosu. Dropping ALL capabilities removes CHOWN and SETUID, so that
+    # chown failed EPERM and the server silently fell back to running as ROOT.
+    # These four are the minimum that let the intended non-root path work; they
+    # are held only by the entrypoint, since exec'ing as 'wine' clears them.
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
     logging:
       driver: json-file
       options:

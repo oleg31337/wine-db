@@ -7,5 +7,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo local)"
-echo "Building wine-db (APP_VERSION=${SHA})"
-APP_VERSION="${SHA}" docker compose build "$@"
+# Provider-agnostic: Podman hosts have no `docker` CLI. Override with
+#   COMPOSE="podman compose" ./scripts/build.sh
+COMPOSE="${COMPOSE:-docker compose}"
+echo "Building wine-db (APP_VERSION=${SHA}, ${COMPOSE})"
+APP_VERSION="${SHA}" $COMPOSE build "$@"

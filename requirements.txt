@@ -1,4 +1,9 @@
 # Pinned with upper bounds to limit supply-chain surface.
+#
+# Security floors below are NOT arbitrary: each one is the first release that
+# fixes an advisory reachable by this app (check with scripts/audit_deps.py +
+# OSV.dev). Raising an upper bound to the next major is deliberate when the
+# current bound *blocks* the fixed release.
 fastapi>=0.115,<0.200
 uvicorn[standard]>=0.34,<1
 sqlalchemy>=2.0.36,<3
@@ -7,6 +12,17 @@ pydantic>=2.9,<3
 pydantic-settings>=2.6,<3
 python-multipart>=0.0.18,<0.1
 argon2-cffi>=23.1,<26
-pyjwt>=2.9,<3
-pillow>=11.0,<13
+# >=2.15.1: PyJWT 2.13.0 is affected by the unauthenticated RecursionError in
+# jwt.decode() (reachable via the attacker-controlled session cookie) plus the
+# DER/public-JWK-as-HMAC-secret and BOM-bypass classes fixed in 2.14.0/2.15.0.
+pyjwt>=2.15.1,<3
+# >=13.0: 41 advisories against 12.3.0, all fixed in 13.0.0 - including
+# JPEG/TIFF/BMP/GIF decoder memory-corruption and the FlashPix RCE. The format
+# allowlist in app/services/images.py deliberately keeps those decoders
+# reachable, so this floor is load-bearing, not cosmetic.
+pillow>=13.0,<14
 httpx>=0.28,<1
+# Direct dependency only to pin the floor: httpx pulls certifi transitively and
+# 2026.7.22 bundles emSign root CAs with compromised intermediate keys
+# (GHSA-6q48-6c7w-9gw2), fixed in 2026.10.19.
+certifi>=2026.10.19,<2028

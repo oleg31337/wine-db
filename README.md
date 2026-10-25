@@ -47,6 +47,48 @@ accounts from the **Data** tab.
 
 ---
 
+## Podman
+
+The stack is plain Compose and runs rootless on Podman; nothing depends on
+Docker. Two host prerequisites:
+
+```bash
+podman compose version                      # a Compose-spec provider (docker-compose v2+ recommended)
+systemctl --user enable --now podman.socket  # compose talks to the Podman API socket, not the CLI
+```
+
+Build and run:
+
+```bash
+COMPOSE="podman compose" ./scripts/build.sh
+podman compose up -d
+```
+
+On an SELinux-enforcing host (Fedora/RHEL) add the overlay so the bind mounts
+receive a private label — without it the containers cannot write `/data` or
+`./pgdata` even though the file modes look right:
+
+```bash
+podman compose -f docker-compose.yml -f compose.podman.yml up -d
+```
+
+Notes:
+
+- **Healthchecks need a systemd user session.** `depends_on: service_healthy` is
+  implemented as a systemd transient timer, so run Podman from a real login
+  session, or enable lingering (`loginctl enable-linger "$USER"`). Where the
+  healthcheck exec cannot run, start the app once the database answers:
+  `podman start <project>-app-1`.
+- **Rootless ownership.** Files under `./data` and `./pgdata` are written by the
+  container user (uid 10001) and appear on the host as a subuid from
+  `/etc/subuid`, not as your login user. Remap them with
+  `podman unshare chown -R 10001:10001 ./data` if you need to edit them directly.
+- **Surviving reboots.** `restart: unless-stopped` covers crashes, not host
+  reboots. For boot-time startup use a Quadlet unit in
+  `~/.config/containers/systemd/`, or `systemctl --user enable podman-restart`.
+
+---
+
 ## Configuration
 
 All backend configuration lives in `.env` (see `.env.example`). The web

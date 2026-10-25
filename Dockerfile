@@ -3,8 +3,13 @@
 # Multi-stage: dependencies are resolved in a builder, then only the virtualenv
 # and application code land in the runtime image. The runtime runs as a
 # non-root user with no build toolchain present.
+#
+# Image names are fully qualified (docker.io/library/...) so the build works
+# under Podman on hosts that enforce short-name resolution (short-name-mode =
+# "enforcing", the default on Fedora/RHEL), where a bare "python:3.13-slim-bookworm"
+# fails to resolve or prompts for a registry.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM docker.io/library/python:3.13-slim-bookworm AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -22,7 +27,7 @@ RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip install -r requirements.txt
 
 
-FROM python:3.13-slim-bookworm AS runtime
+FROM docker.io/library/python:3.13-slim-bookworm AS runtime
 
 ARG APP_VERSION=local
 ENV PYTHONDONTWRITEBYTECODE=1 \

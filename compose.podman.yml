@@ -1,0 +1,20 @@
+# Podman overlay — only needed on SELinux-enforcing hosts (Fedora, RHEL,
+# CentOS, openSUSE), where a bind mount without a label is denied inside the
+# container even when the file mode looks correct. `:Z` relabels the directory
+# private to the container. Docker ignores the option, and so does Podman on a
+# host with SELinux disabled, so keeping this file is harmless.
+#
+#   podman compose -f docker-compose.yml -f compose.podman.yml up -d
+#
+# (scripts/build.sh also honours COMPOSE="podman compose".) Nothing else in the
+# stack is Docker-specific: the base file already uses fully-qualified image
+# names, and Compose merges these volume entries by mount path, so the `:Z`
+# suffix replaces the unlabelled entry rather than adding a second mount.
+
+services:
+  db:
+    volumes:
+      - ${PG_DATA_DIR:-./pgdata}:/var/lib/postgresql/data:Z
+  app:
+    volumes:
+      - ${DATA_DIR:-./data}:/data:Z

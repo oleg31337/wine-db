@@ -80,7 +80,7 @@ def _encode(img: Image.Image, dimension: int, fmt: str) -> bytes:
     clean, model-friendly, storage-friendly copy.
     """
     img = img.convert("RGB")
-    img.thumbnail((dimension, dimension), Image.LANCZOS)
+    img.thumbnail((dimension, dimension), Image.Resampling.LANCZOS)
     out = io.BytesIO()
     img.save(out, format=fmt, quality=85, optimize=True)
     return out.getvalue()

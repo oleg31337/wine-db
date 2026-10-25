@@ -36,7 +36,10 @@ DATA_UID=$(id -u wine)
 
 # Only attempt chown when the directory isn't already owned by the app user.
 if [ "$(stat -c '%u' /data 2>/dev/null)" != "$DATA_UID" ]; then
-    mkdir -p /data/uploads
+    # Never abort the boot if the mount cannot be written by root at all (e.g. a
+    # uid-mismatched bind mount combined with cap_drop); the fallback below still
+    # runs the server, and the app creates uploads/ on first write.
+    mkdir -p /data/uploads 2>/dev/null || true
     if chown -R wine:wine /data 2>/dev/null; then
         : # ownership fixed; we will drop to 'wine' below
     else
